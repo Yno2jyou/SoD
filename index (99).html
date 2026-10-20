@@ -1,0 +1,2336 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="description" content="" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Noto+Serif+JP:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<title>無題</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --background:0 0% 99%;--foreground:0 0% 10%;--card:0 0% 100%;--card-foreground:0 0% 10%;
+  --primary:0 0% 10%;--primary-foreground:0 0% 98%;--secondary:0 0% 96.1%;--secondary-foreground:0 0% 10%;
+  --muted:0 0% 94%;--muted-foreground:0 0% 42%;--accent:355 90% 18%;--accent-foreground:0 0% 98%;
+  --border:0 0% 88%;--input:0 0% 88%;--ring:0 0% 10%;--radius:0.25rem;
+  --font-heading:"Cormorant Garamond","Noto Serif JP","Hiragino Mincho ProN","Yu Mincho",serif;
+  --font-body:"Noto Serif JP","Hiragino Mincho ProN","Yu Mincho","游明朝","MS Mincho",serif;
+  --font-display:"Cormorant Garamond","Noto Serif JP",Georgia,serif;
+  --charcoal:#1a1a1a;--offwhite:#fcfcfc;--wine:#4a0404;--lightgray:#e0e0e0;
+}
+.dark{
+  --background:0 0% 10%;--foreground:0 0% 96%;--card:0 0% 12%;--card-foreground:0 0% 96%;
+  --primary:0 0% 96%;--primary-foreground:0 0% 10%;--secondary:0 0% 16%;--secondary-foreground:0 0% 96%;
+  --muted:0 0% 16%;--muted-foreground:0 0% 62%;--accent:355 70% 32%;--accent-foreground:0 0% 96%;
+  --border:0 0% 22%;--input:0 0% 22%;--ring:0 0% 70%;
+}
+html{scroll-behavior:smooth;touch-action:manipulation;-ms-touch-action:manipulation}
+body{touch-action:manipulation;overscroll-behavior:none}
+body{background:hsl(var(--background));color:hsl(var(--foreground));font-family:var(--font-body);font-feature-settings:"palt";-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;min-height:100vh;touch-action:manipulation;overscroll-behavior:none}
+::selection{background:hsl(var(--accent)/0.85);color:hsl(var(--accent-foreground))}
+.font-display{font-family:var(--font-display)}
+.font-heading{font-family:var(--font-heading)}
+.font-body{font-family:var(--font-body)}
+.novel-text{font-family:var(--font-body);line-height:1.95;letter-spacing:0.04em;text-align:start;overflow-wrap:break-word;word-break:normal;hanging-punctuation:first;orphans:3;widows:3}
+.novel-text p{margin-bottom:1.4em;text-indent:1em}
+.novel-text p.dialogue{text-indent:0!important}
+
+.page-flash{position:fixed;inset:0;background:var(--offwhite);pointer-events:none;z-index:9999;opacity:0;transition:opacity 0.18s ease-out}
+.page-flash.is-on{opacity:1}
+.title-char{display:inline-block;opacity:0;transform:translate3d(var(--dx,0),var(--dy,0),0) rotate(var(--dr,0deg));transition:transform 1.6s cubic-bezier(0.19,1,0.22,1),opacity 1.4s ease-out}
+.title-char.is-settled{opacity:1;transform:translate3d(0,0,0) rotate(0deg)}
+.title-break-mobile{display:none}
+@media (max-width:640px){
+  .title-break-mobile{display:block}
+  .home-title{font-size:clamp(1.85rem,9.5vw,2.8rem)!important;line-height:1.25!important}
+}
+.toc-row{transition:transform 0.7s cubic-bezier(0.22,1,0.36,1),color 0.7s ease}
+.toc-row:hover{transform:translateX(3px)}
+@media (prefers-reduced-motion:reduce){.title-char,.toc-row{transition:none!important}html{scroll-behavior:auto}}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+ul{list-style:none}
+@media(min-width:640px){.sm-inline{display:inline!important}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+(function(){
+  var prevent = function(e){ if (e.touches && e.touches.length > 1) e.preventDefault(); };
+  document.addEventListener("gesturestart", function(e){ e.preventDefault(); }, {passive:false});
+  document.addEventListener("gesturechange", function(e){ e.preventDefault(); }, {passive:false});
+  document.addEventListener("gestureend", function(e){ e.preventDefault(); }, {passive:false});
+  var lastTouchEnd = 0;
+  document.addEventListener("touchend", function(e){
+    var now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, {passive:false});
+})();
+</script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script>
+const defaultNovelMeta = {
+  title: "",
+  titleEn: "",
+  subtitle: "",
+  synopsis: "",
+  note: "",
+  characters: [
+    { name: "", role: "", desc: "" }
+  ],
+  timeline: [
+    { when: "", event: "" }
+  ]
+};
+const defaultChapters = [
+{
+    num: 1,
+    title: "",
+    paragraphs: []
+  }
+];
+
+</script>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef, useCallback, createContext, useContext } = React;
+
+// ===== 保存先設定（元サイトとは完全に分離）=====
+// Firebase: 専用プロジェクト（speak-or-die-9d2f2）に保存します。
+// localStorage: キー接頭辞も別（novelblank:*）なので、同一ドメインでも衝突しません。
+const STORAGE_COLLECTION = "novel";
+const STORAGE_DOC = "main";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAHNl0ZDxpgu2vTXILqXL11ukq22Zgh5Dk",
+  authDomain: "speak-or-die-9d2f2.firebaseapp.com",
+  projectId: "speak-or-die-9d2f2",
+  storageBucket: "speak-or-die-9d2f2.firebasestorage.app",
+  messagingSenderId: "854343839451",
+  appId: "1:854343839451:web:465984557f42ddab67e6fe",
+  measurementId: "G-40YZFYQH04"
+};
+
+let db = null;
+let auth = null;
+try {
+  if (typeof firebase !== "undefined") {
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    // WebChannel/QUIC 不通時の回避（file:// や一部ネットワーク向け）
+    try {
+      firebase.firestore().settings({
+        experimentalForceLongPolling: true,
+        merge: true
+      });
+    } catch (settingsErr) {
+      console.warn("Firestore settings:", settingsErr);
+    }
+    db = firebase.firestore();
+    auth = firebase.auth();
+    console.info(
+      "[Firebase] projectId=",
+      firebaseConfig.projectId,
+      "apps=",
+      firebase.apps.length
+    );
+  } else {
+    console.warn("Firebase SDK not loaded");
+  }
+} catch (e) {
+  console.warn("Firebase init failed:", e);
+}
+
+
+// Firestore REST helpers（SDK WebChannel 404 回避）
+const FS_DOC_URL =
+  "https://firestore.googleapis.com/v1/projects/" +
+  firebaseConfig.projectId +
+  "/databases/(default)/documents/" + STORAGE_COLLECTION + "/" + STORAGE_DOC;
+
+function fromFirestoreValue(v) {
+  if (v == null) return null;
+  if ("stringValue" in v) return v.stringValue;
+  if ("integerValue" in v) return Number(v.integerValue);
+  if ("doubleValue" in v) return v.doubleValue;
+  if ("booleanValue" in v) return v.booleanValue;
+  if ("nullValue" in v) return null;
+  if ("timestampValue" in v) return v.timestampValue;
+  if ("arrayValue" in v) {
+    const vals = (v.arrayValue && v.arrayValue.values) || [];
+    return vals.map(fromFirestoreValue);
+  }
+  if ("mapValue" in v) {
+    const fields = (v.mapValue && v.mapValue.fields) || {};
+    const out = {};
+    Object.keys(fields).forEach(function (k) {
+      out[k] = fromFirestoreValue(fields[k]);
+    });
+    return out;
+  }
+  return null;
+}
+
+function firestoreDocToObject(doc) {
+  if (!doc || !doc.fields) return null;
+  const out = {};
+  Object.keys(doc.fields).forEach(function (k) {
+    out[k] = fromFirestoreValue(doc.fields[k]);
+  });
+  return out;
+}
+
+function toFirestoreValue(val) {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === "string") return { stringValue: val };
+  if (typeof val === "boolean") return { booleanValue: val };
+  if (typeof val === "number") {
+    if (Number.isInteger(val)) return { integerValue: String(val) };
+    return { doubleValue: val };
+  }
+  if (Array.isArray(val)) {
+    return { arrayValue: { values: val.map(toFirestoreValue) } };
+  }
+  if (typeof val === "object") {
+    const fields = {};
+    Object.keys(val).forEach(function (k) {
+      if (val[k] !== undefined) fields[k] = toFirestoreValue(val[k]);
+    });
+    return { mapValue: { fields: fields } };
+  }
+  return { stringValue: String(val) };
+}
+
+function objectToFirestoreDoc(obj) {
+  const fields = {};
+  Object.keys(obj).forEach(function (k) {
+    if (obj[k] !== undefined) fields[k] = toFirestoreValue(obj[k]);
+  });
+  return { fields: fields };
+}
+
+async function loadNovelViaRest() {
+  const url = FS_DOC_URL + "?key=" + encodeURIComponent(firebaseConfig.apiKey);
+  const res = await fetch(url);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error("REST read " + res.status + ": " + text.slice(0, 200));
+  }
+  const doc = await res.json();
+  return firestoreDocToObject(doc);
+}
+
+async function saveNovelViaRest(payload, idToken) {
+  const body = objectToFirestoreDoc(payload);
+  const headers = { "Content-Type": "application/json" };
+  if (idToken) headers["Authorization"] = "Bearer " + idToken;
+  const res = await fetch(FS_DOC_URL + "?key=" + encodeURIComponent(firebaseConfig.apiKey), {
+    method: "PATCH",
+    headers: headers,
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error("REST write " + res.status + ": " + text.slice(0, 300));
+  }
+  return res.json();
+}
+
+const SIZES = [
+  { label: "極小", value: "0.75rem" },
+  { label: "小", value: "0.85rem" },
+  { label: "中", value: "1.0rem" },
+  { label: "大", value: "1.15rem" },
+  { label: "特大", value: "1.35rem" }
+];
+
+const NovelContext = createContext(null);
+
+function useHashRoute() {
+  const [route, setRoute] = useState(() => window.location.hash.slice(1) || "/");
+  useEffect(() => {
+    const onChange = () => {
+      setRoute(window.location.hash.slice(1) || "/");
+      window.scrollTo({ top: 0, behavior: "auto" });
+    };
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+  return route;
+}
+
+const Icon = ({ w, h, d, props }) =>
+  React.createElement(
+    "svg",
+    {
+      width: w,
+      height: h,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      ...props
+    },
+    d.map((p, i) => React.createElement("path", { key: i, d: p }))
+  );
+
+function TitleAssemble({ text, charDelay = 70 }) {
+  const [settled, setSettled] = useState(false);
+  const chars = useMemo(() => Array.from(text || ""), [text]);
+  // タイトルの改行位置（必要なら調整）
+  const breakAfter = useMemo(() => {
+    const t = text || "";
+    return -1;
+  }, [text]);
+  useEffect(() => {
+    setSettled(false);
+    const t = setTimeout(() => setSettled(true), 80);
+    return () => clearTimeout(t);
+  }, [text]);
+  const nodes = [];
+  chars.forEach((ch, i) => {
+    const h = (i * 9301 + 233) % 233280;
+    const n = h / 233280;
+    const dx = (n - 0.5) * 40,
+      dy = ((n * 7) % 1 - 0.5) * 28,
+      dr = ((n * 13) % 1 - 0.5) * 8;
+    nodes.push(
+      React.createElement(
+        "span",
+        {
+          key: "c" + i,
+          className: "title-char" + (settled ? " is-settled" : ""),
+          style: {
+            "--dx": dx + "px",
+            "--dy": dy + "px",
+            "--dr": dr + "deg",
+            transitionDelay: i * charDelay + "ms"
+          },
+          "aria-hidden": "true"
+        },
+        ch === " " ? " " : ch
+      )
+    );
+    if (i === breakAfter) {
+      nodes.push(
+        React.createElement("br", {
+          key: "br",
+          className: "title-break-mobile",
+          "aria-hidden": "true"
+        })
+      );
+    }
+  });
+  return React.createElement("span", { "aria-label": text }, nodes);
+}
+
+function ReadingControls({ fontIndex, setFontIndex, dark, setDark }) {
+  return React.createElement(
+    "div",
+    { style: { display: "flex", alignItems: "center", gap: "0.25rem" } },
+    React.createElement(
+      "div",
+      {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          borderRadius: "2px",
+          border: "1px solid hsl(var(--border) / 0.6)",
+          overflow: "hidden"
+        }
+      },
+      React.createElement(
+        "button",
+        {
+          onClick: () => setFontIndex((i) => Math.max(0, i - 1)),
+          disabled: fontIndex <= 0,
+          style: {
+            padding: "6px",
+            color: "hsl(var(--foreground) / 0.6)",
+            opacity: fontIndex <= 0 ? 0.3 : 1,
+            cursor: fontIndex <= 0 ? "not-allowed" : "pointer"
+          },
+          title: "文字を小さく"
+        },
+        React.createElement(Icon, { w: 14, h: 14, d: ["M5 12h14"] })
+      ),
+      React.createElement(
+        "span",
+        {
+          style: {
+            padding: "0 6px",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            fontSize: "0.7rem",
+            color: "hsl(var(--foreground) / 0.5)"
+          }
+        },
+        React.createElement(Icon, {
+          w: 12,
+          h: 12,
+          d: ["M4 7 L4 4 L20 4 L20 7", "M9 20 L15 20", "M12 4 L12 20"]
+        })
+      ),
+      React.createElement(
+        "button",
+        {
+          onClick: () => setFontIndex((i) => Math.min(SIZES.length - 1, i + 1)),
+          disabled: fontIndex >= SIZES.length - 1,
+          style: {
+            padding: "6px",
+            color: "hsl(var(--foreground) / 0.6)",
+            opacity: fontIndex >= SIZES.length - 1 ? 0.3 : 1,
+            cursor: fontIndex >= SIZES.length - 1 ? "not-allowed" : "pointer"
+          },
+          title: "文字を大きく"
+        },
+        React.createElement(Icon, { w: 14, h: 14, d: ["M5 12h14", "M12 5v14"] })
+      )
+    ),
+    React.createElement(
+      "button",
+      {
+        onClick: () => setDark((d) => !d),
+        style: {
+          padding: "6px",
+          borderRadius: "2px",
+          border: "1px solid hsl(var(--border) / 0.6)",
+          color: "hsl(var(--foreground) / 0.6)"
+        },
+        title: dark ? "明るい画面へ" : "暗い画面へ"
+      },
+      dark
+        ? React.createElement(Icon, {
+            w: 14,
+            h: 14,
+            d: ["M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"]
+          })
+        : React.createElement(Icon, {
+            w: 14,
+            h: 14,
+            d: [
+              "M12 2v2",
+              "M12 20v2",
+              "M4.93 4.93l1.41 1.41",
+              "M17.66 17.66l1.41 1.41",
+              "M2 12h2",
+              "M20 12h2",
+              "M6.34 17.66l-1.41 1.41",
+              "M19.07 4.93l-1.41 1.41",
+              "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8"
+            ]
+          })
+    )
+  );
+}
+
+function PageFlash() {
+  const [on, setOn] = useState(false);
+  const route = useHashRoute();
+  useEffect(() => {
+    setOn(true);
+    const t = setTimeout(() => setOn(false), 180);
+    return () => clearTimeout(t);
+  }, [route]);
+  return React.createElement("div", {
+    className: "page-flash" + (on ? " is-on" : ""),
+    "aria-hidden": "true"
+  });
+}
+
+function LoginModal({ onClose, onSuccess }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await auth.signInWithEmailAndPassword(email.trim(), password);
+      onSuccess && onSuccess();
+    } catch (err) {
+      const code = err && err.code ? err.code : "";
+      const messages = {
+        "auth/invalid-email": "メールアドレスの形式が正しくありません",
+        "auth/user-disabled": "このアカウントは無効です",
+        "auth/user-not-found": "アカウントが見つかりません",
+        "auth/wrong-password": "パスワードが違います",
+        "auth/invalid-credential": "メールまたはパスワードが正しくありません",
+        "auth/too-many-requests": "試行回数が多すぎます。しばらく待ってください"
+      };
+      setError(messages[code] || (err && err.message) || "ログインに失敗しました");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return React.createElement(
+    "div",
+    {
+      style: {
+        position: "fixed",
+        inset: 0,
+        zIndex: 200,
+        background: "rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "1.5rem"
+      },
+      onClick: (e) => {
+        if (e.target === e.currentTarget) onClose && onClose();
+      }
+    },
+    React.createElement(
+      "div",
+      {
+        style: {
+          width: "100%",
+          maxWidth: "22rem",
+          background: "var(--offwhite)",
+          color: "var(--charcoal)",
+          borderRadius: "4px",
+          padding: "2rem 1.75rem",
+          boxShadow: "0 12px 40px rgba(0,0,0,0.25)"
+        },
+        onClick: (e) => e.stopPropagation()
+      },
+      React.createElement(
+        "p",
+        {
+          className: "font-display",
+          style: {
+            letterSpacing: "0.35em",
+            fontSize: "0.65rem",
+            textTransform: "uppercase",
+            opacity: 0.45,
+            marginBottom: "0.75rem"
+          }
+        },
+        "Editor Access"
+      ),
+      React.createElement(
+        "h2",
+        {
+          className: "font-heading",
+          style: {
+            fontWeight: 300,
+            fontSize: "1.35rem",
+            letterSpacing: "0.12em",
+            marginBottom: "1.75rem"
+          }
+        },
+        "ログイン"
+      ),
+      React.createElement(
+        "form",
+        { onSubmit: submit },
+        React.createElement(
+          "label",
+          {
+            style: {
+              display: "block",
+              fontSize: "0.7rem",
+              letterSpacing: "0.15em",
+              opacity: 0.55,
+              marginBottom: "0.35rem"
+            }
+          },
+          "EMAIL"
+        ),
+        React.createElement("input", {
+          type: "email",
+          required: true,
+          autoComplete: "email",
+          value: email,
+          onChange: (e) => setEmail(e.target.value),
+          style: {
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "0.65rem 0.75rem",
+            marginBottom: "1.1rem",
+            border: "1px solid hsl(0 0% 10% / 0.2)",
+            borderRadius: "2px",
+            fontFamily: "var(--font-body)",
+            fontSize: "16px",
+            background: "hsl(0 0% 100%)",
+            color: "var(--charcoal)",
+            outline: "none"
+          }
+        }),
+        React.createElement(
+          "label",
+          {
+            style: {
+              display: "block",
+              fontSize: "0.7rem",
+              letterSpacing: "0.15em",
+              opacity: 0.55,
+              marginBottom: "0.35rem"
+            }
+          },
+          "PASSWORD"
+        ),
+        React.createElement("input", {
+          type: "password",
+          required: true,
+          autoComplete: "current-password",
+          value: password,
+          onChange: (e) => setPassword(e.target.value),
+          style: {
+            width: "100%",
+            boxSizing: "border-box",
+            padding: "0.65rem 0.75rem",
+            marginBottom: "0.75rem",
+            border: "1px solid hsl(0 0% 10% / 0.2)",
+            borderRadius: "2px",
+            fontFamily: "var(--font-body)",
+            fontSize: "16px",
+            background: "hsl(0 0% 100%)",
+            color: "var(--charcoal)",
+            outline: "none"
+          }
+        }),
+        error
+          ? React.createElement(
+              "p",
+              {
+                style: {
+                  fontSize: "0.8rem",
+                  color: "var(--wine)",
+                  marginBottom: "0.75rem",
+                  lineHeight: 1.5
+                }
+              },
+              error
+            )
+          : null,
+        React.createElement(
+          "button",
+          {
+            type: "submit",
+            disabled: loading,
+            style: {
+              width: "100%",
+              marginTop: "0.5rem",
+              padding: "0.7rem 1rem",
+              fontFamily: "var(--font-heading)",
+              letterSpacing: "0.25em",
+              fontSize: "0.85rem",
+              background: "var(--charcoal)",
+              color: "var(--offwhite)",
+              borderRadius: "2px",
+              cursor: loading ? "wait" : "pointer",
+              opacity: loading ? 0.65 : 1
+            }
+          },
+          loading ? "処理中…" : "LOGIN"
+        )
+      ),
+      React.createElement(
+        "div",
+        {
+          style: {
+            marginTop: "1.5rem",
+            display: "flex",
+            justifyContent: "flex-end"
+          }
+        },
+        React.createElement(
+          "button",
+          {
+            type: "button",
+            onClick: onClose,
+            style: {
+              fontSize: "0.75rem",
+              letterSpacing: "0.08em",
+              color: "var(--charcoal)",
+              opacity: 0.4,
+              cursor: "pointer",
+              background: "none",
+              border: "none",
+              padding: 0
+            }
+          },
+          "閉じる"
+        )
+      )
+    )
+  );
+}
+
+function EditToolbar() {
+  const {
+    editing,
+    setEditing,
+    saving,
+    saveToFirebase,
+    dirty,
+    user,
+    showLogin,
+    setShowLogin,
+    logout
+  } = useContext(NovelContext);
+
+  const onEditClick = () => {
+    if (user) {
+      setEditing(true);
+    } else {
+      setShowLogin(true);
+    }
+  };
+
+  const onLogoutClick = async () => {
+    await logout();
+    setEditing(false);
+  };
+
+  const btnBase = {
+    fontFamily: "var(--font-heading)",
+    letterSpacing: "0.12em",
+    fontSize: "0.65rem",
+    padding: "0.35rem 0.65rem",
+    borderRadius: "2px",
+    cursor: "pointer",
+    border: "1px solid hsl(0 0% 10% / 0.25)",
+    boxShadow: "0 1px 6px rgba(0,0,0,0.12)"
+  };
+
+  return React.createElement(
+    "div",
+    {
+      style: {
+        position: "fixed",
+        bottom: "1rem",
+        right: "1rem",
+        zIndex: 100,
+        display: "flex",
+        gap: "0.35rem",
+        alignItems: "center",
+        justifyContent: "flex-end"
+      }
+    },
+    dirty &&
+      editing &&
+      React.createElement(
+        "span",
+        {
+          style: {
+            fontSize: "0.55rem",
+            letterSpacing: "0.08em",
+            color: "var(--wine)",
+            background: "var(--offwhite)",
+            padding: "2px 6px",
+            borderRadius: "2px",
+            border: "1px solid var(--wine)",
+            opacity: 0.9
+          }
+        },
+        "未保存"
+      ),
+    // 編集画面: SAVE + LOGOUT のみ
+    editing
+      ? React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(
+            "button",
+            {
+              onClick: saveToFirebase,
+              disabled: saving,
+              style: {
+                ...btnBase,
+                background: "var(--wine)",
+                color: "var(--offwhite)",
+                border: "1px solid var(--wine)",
+                opacity: saving ? 0.6 : 1,
+                cursor: saving ? "wait" : "pointer"
+              }
+            },
+            saving ? "保存中…" : "SAVE"
+          ),
+          React.createElement(
+            "button",
+            {
+              onClick: onLogoutClick,
+              style: {
+                ...btnBase,
+                background: "var(--offwhite)",
+                color: "var(--charcoal)"
+              }
+            },
+            "LOGOUT"
+          )
+        )
+      : // 閲覧画面: EDIT のみ
+        React.createElement(
+          "button",
+          {
+            onClick: onEditClick,
+            style: {
+              ...btnBase,
+              background: "var(--offwhite)",
+              color: "var(--charcoal)"
+            }
+          },
+          "EDIT"
+        ),
+    showLogin &&
+      React.createElement(LoginModal, {
+        onClose: () => setShowLogin(false),
+        onSuccess: () => {
+          setShowLogin(false);
+          setEditing(true);
+        }
+      })
+  );
+}
+
+function EditableText({ value, onChange, multiline, style, className, as }) {
+  const { editing } = useContext(NovelContext);
+  const Tag = as || (multiline ? "textarea" : "input");
+  if (!editing) {
+    if (multiline) {
+      return React.createElement(
+        "div",
+        { className, style },
+        typeof value === "string"
+          ? value.split("\n").map((line, i) =>
+              React.createElement("p", { key: i, style: { marginBottom: i < value.split("\n").length - 1 ? "1.4em" : 0 } }, line)
+            )
+          : value
+      );
+    }
+    return React.createElement("span", { className, style }, value);
+  }
+  const baseStyle = {
+    font: "inherit",
+    color: "inherit",
+    letterSpacing: "inherit",
+    lineHeight: "inherit",
+    background: "hsl(var(--accent) / 0.06)",
+    border: "1px dashed hsl(var(--accent) / 0.35)",
+    borderRadius: "2px",
+    padding: multiline ? "0.5rem" : "0.15rem 0.35rem",
+    width: "100%",
+    boxSizing: "border-box",
+    resize: multiline ? "vertical" : "none",
+    outline: "none",
+    ...style
+  };
+  if (multiline) {
+    return React.createElement("textarea", {
+      value: value || "",
+      onChange: (e) => onChange(e.target.value),
+      style: { ...baseStyle, minHeight: "6rem" },
+      className,
+      rows: Math.max(4, (value || "").split("\n").length + 1)
+    });
+  }
+  return React.createElement("input", {
+    type: "text",
+    value: value || "",
+    onChange: (e) => onChange(e.target.value),
+    style: baseStyle,
+    className
+  });
+}
+
+function Home() {
+  const { meta, updateMeta, chapters, editing } = useContext(NovelContext);
+  const [entered, setEntered] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setEntered(true), 400);
+    return () => clearTimeout(t);
+  }, []);
+  const total = chapters.length;
+  return React.createElement(
+    "main",
+    { style: { position: "relative", minHeight: "100vh", background: "var(--charcoal)", color: "var(--offwhite)" } },
+    React.createElement(
+      "div",
+      {
+        style: {
+          position: "relative",
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 1.5rem",
+          textAlign: "center",
+          overflow: "hidden"
+        }
+      },
+      React.createElement("div", {
+        style: {
+          position: "absolute",
+          top: "14%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          height: "1px",
+          background: "var(--offwhite)",
+          opacity: 0.4,
+          width: entered ? "1px" : "0",
+          transition: "width 2200ms ease-out"
+        }
+      }),
+      React.createElement("div", {
+        style: {
+          position: "absolute",
+          bottom: "14%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          height: "1px",
+          background: "var(--offwhite)",
+          opacity: 0.4,
+          width: entered ? "1px" : "0",
+          transition: "width 2200ms ease-out 300ms"
+        }
+      }),
+      React.createElement(
+        "div",
+        { style: { position: "relative", zIndex: 10 } },
+        React.createElement(
+          "p",
+          {
+            className: "font-display",
+            style: {
+              letterSpacing: "0.5em",
+              fontSize: "0.7rem",
+              textTransform: "uppercase",
+              color: "var(--offwhite)",
+              opacity: entered ? 0.5 : 0,
+              marginBottom: "2.5rem",
+              transition: "opacity 1000ms"
+            }
+          },
+          React.createElement(EditableText, {
+            value: meta.subtitle || "A LITERARY WORK",
+            onChange: (v) => updateMeta({ subtitle: v }),
+            style: { background: "transparent", border: "none", textAlign: "center", color: "inherit", letterSpacing: "0.5em", fontSize: "0.7rem" }
+          })
+        ),
+        React.createElement(
+          "h1",
+          {
+            className: "font-heading home-title",
+            style: {
+              fontWeight: 300,
+              lineHeight: 1.15,
+              letterSpacing: "0.12em",
+              fontSize: "clamp(2.4rem, 8vw, 5.5rem)"
+            }
+          },
+          editing
+            ? React.createElement(EditableText, {
+                value: meta.title,
+                onChange: (v) => updateMeta({ title: v }),
+                style: {
+                  background: "transparent",
+                  border: "none",
+                  textAlign: "center",
+                  color: "inherit",
+                  fontWeight: 300,
+                  letterSpacing: "0.12em",
+                  fontSize: "inherit",
+                  width: "100%"
+                }
+              })
+            : React.createElement(TitleAssemble, {
+                text: meta.title || "",
+                charDelay: 70
+              })
+        ),
+        React.createElement("div", {
+          style: {
+            marginTop: "2rem",
+            height: "1px",
+            background: "var(--wine)",
+            width: entered ? "4rem" : "0",
+            marginLeft: "auto",
+            marginRight: "auto",
+            transition: "width 1800ms ease-out 700ms"
+          }
+        }),
+        React.createElement(
+          "p",
+          {
+            className: "font-display",
+            style: {
+              fontStyle: "italic",
+              fontWeight: 300,
+              marginTop: "2rem",
+              color: "var(--offwhite)",
+              opacity: entered ? 0.7 : 0,
+              fontSize: "1rem",
+              letterSpacing: "wide",
+              transition: "opacity 1000ms 500ms"
+            }
+          },
+          React.createElement(EditableText, {
+            value: meta.titleEn,
+            onChange: (v) => updateMeta({ titleEn: v }),
+            style: {
+              background: "transparent",
+              border: "none",
+              textAlign: "center",
+              color: "inherit",
+              fontStyle: "italic",
+              width: "100%"
+            }
+          })
+        ),
+        React.createElement(
+          "div",
+          {
+            style: {
+              marginTop: "4rem",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "1.25rem",
+              opacity: entered ? 1 : 0,
+              transform: entered ? "translateY(0)" : "translateY(10px)",
+              transition: "all 1000ms 700ms"
+            }
+          },
+          React.createElement(
+            "a",
+            {
+              href: "#/contents",
+              style: {
+                position: "relative",
+                fontFamily: "var(--font-heading)",
+                letterSpacing: "0.25em",
+                fontSize: "0.875rem",
+                color: "var(--offwhite)",
+                opacity: 0.9,
+                paddingBottom: "4px"
+              }
+            },
+            "物語を読む",
+            React.createElement("span", {
+              style: {
+                position: "absolute",
+                left: 0,
+                bottom: 0,
+                height: "1px",
+                width: "100%",
+                background: "var(--offwhite)",
+                opacity: 0.5
+              }
+            })
+          )
+        ),
+        React.createElement(
+          "p",
+          {
+            style: {
+              marginTop: "3rem",
+              fontFamily: "var(--font-body)",
+              fontSize: "0.7rem",
+              letterSpacing: "0.2em",
+              color: "var(--offwhite)",
+              opacity: entered ? 0.3 : 0,
+              transition: "opacity 1000ms"
+            }
+          },
+          "全" +
+            (total === 34 ? "三十四" : String(total)) +
+            "話 ／ The Complete Text"
+        )
+      )
+    ),
+    React.createElement(
+      "section",
+      {
+        style: {
+          background: "var(--offwhite)",
+          color: "var(--charcoal)",
+          padding: "5rem 1.5rem 7rem"
+        }
+      },
+      React.createElement(
+        "div",
+        { style: { maxWidth: "42rem", margin: "0 auto" } },
+        React.createElement(
+          "p",
+          {
+            className: "font-display",
+            style: {
+              letterSpacing: "0.4em",
+              textTransform: "uppercase",
+              fontSize: "0.65rem",
+              color: "var(--charcoal)",
+              opacity: 0.4,
+              marginBottom: "1.5rem"
+            }
+          },
+          "Synopsis"
+        ),
+        React.createElement(
+          "h2",
+          {
+            className: "font-heading",
+            style: {
+              fontWeight: 300,
+              fontSize: "1.5rem",
+              letterSpacing: "0.1em",
+              marginBottom: "0.5rem"
+            }
+          },
+          React.createElement(EditableText, {
+            value: meta.title,
+            onChange: (v) => updateMeta({ title: v }),
+            style: { background: "transparent", border: "none", fontWeight: 300, letterSpacing: "0.1em", width: "100%" }
+          })
+        ),
+        React.createElement(
+          "p",
+          {
+            className: "font-display",
+            style: {
+              fontStyle: "italic",
+              color: "var(--charcoal)",
+              opacity: 0.5,
+              marginBottom: "2.5rem"
+            }
+          },
+          React.createElement(EditableText, {
+            value: meta.titleEn,
+            onChange: (v) => updateMeta({ titleEn: v }),
+            style: { background: "transparent", border: "none", fontStyle: "italic", width: "100%" }
+          })
+        ),
+        React.createElement("div", {
+          style: { height: "1px", width: "3rem", background: "var(--wine)", marginBottom: "2.5rem" }
+        }),
+        React.createElement(
+          "blockquote",
+          {
+            style: {
+              marginTop: "0",
+              paddingLeft: "1.5rem",
+              borderLeft: "1px solid hsl(355 90% 18% / 0.4)",
+              marginBottom: "2.5rem"
+            }
+          },
+          React.createElement(
+            "p",
+            {
+              className: "font-heading",
+              style: {
+                fontWeight: 300,
+                fontSize: "1.25rem",
+                lineHeight: 1.6,
+                letterSpacing: "0.06em",
+                color: "var(--charcoal)",
+                opacity: 0.8
+              }
+            },
+            "完璧であることは死んでいることと同じなのよ。"
+          ),
+          React.createElement(
+            "p",
+            {
+              className: "font-body",
+              style: {
+                fontSize: "0.75rem",
+                letterSpacing: "0.15em",
+                color: "var(--charcoal)",
+                opacity: 0.4,
+                marginTop: "1rem"
+              }
+            },
+            "── 本文より"
+          )
+        ),
+        React.createElement(EditableText, {
+          value: meta.synopsis,
+          onChange: (v) => updateMeta({ synopsis: v }),
+          multiline: true,
+          className: "font-body",
+          style: {
+            lineHeight: 2,
+            fontSize: "0.95rem",
+            color: "var(--charcoal)",
+            opacity: 0.85,
+            textAlign: "justify",
+            letterSpacing: "0.02em",
+            whiteSpace: "pre-wrap"
+          }
+        }),
+        React.createElement(
+          "section",
+          { style: { marginTop: "4.5rem" } },
+          React.createElement(
+            "p",
+            {
+              className: "font-display",
+              style: {
+                letterSpacing: "0.4em",
+                textTransform: "uppercase",
+                fontSize: "0.65rem",
+                color: "var(--charcoal)",
+                opacity: 0.4,
+                marginBottom: "1.25rem"
+              }
+            },
+            "Characters"
+          ),
+          React.createElement(
+            "h3",
+            {
+              className: "font-heading",
+              style: {
+                fontWeight: 300,
+                fontSize: "1.15rem",
+                letterSpacing: "0.12em",
+                marginBottom: "1.75rem"
+              }
+            },
+            "登場人物"
+          ),
+          React.createElement(
+            "ul",
+            { style: { listStyle: "none", padding: 0, margin: 0 } },
+            (meta.characters || []).map((ch, i) =>
+              React.createElement(
+                "li",
+                {
+                  key: i,
+                  style: {
+                    padding: "1.15rem 0",
+                    borderBottom: "1px solid hsl(0 0% 10% / 0.1)"
+                  }
+                },
+                React.createElement(
+                  "div",
+                  {
+                    style: {
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "baseline",
+                      gap: "0.75rem",
+                      marginBottom: "0.4rem"
+                    }
+                  },
+                  React.createElement(EditableText, {
+                    value: ch.name,
+                    onChange: (v) => {
+                      const next = (meta.characters || []).map((c, j) =>
+                        j === i ? { ...c, name: v } : c
+                      );
+                      updateMeta({ characters: next });
+                    },
+                    style: {
+                      fontFamily: "var(--font-heading)",
+                      fontWeight: 400,
+                      fontSize: "1rem",
+                      letterSpacing: "0.08em",
+                      background: "transparent",
+                      border: "none",
+                      color: "var(--charcoal)"
+                    }
+                  }),
+                  React.createElement(EditableText, {
+                    value: ch.role,
+                    onChange: (v) => {
+                      const next = (meta.characters || []).map((c, j) =>
+                        j === i ? { ...c, role: v } : c
+                      );
+                      updateMeta({ characters: next });
+                    },
+                    style: {
+                      fontSize: "0.7rem",
+                      letterSpacing: "0.12em",
+                      color: "var(--wine)",
+                      opacity: 0.85,
+                      background: "transparent",
+                      border: "none"
+                    }
+                  })
+                ),
+                React.createElement(EditableText, {
+                  value: ch.desc,
+                  onChange: (v) => {
+                    const next = (meta.characters || []).map((c, j) =>
+                      j === i ? { ...c, desc: v } : c
+                    );
+                    updateMeta({ characters: next });
+                  },
+                  multiline: true,
+                  className: "font-body",
+                  style: {
+                    fontSize: "0.85rem",
+                    lineHeight: 1.85,
+                    color: "var(--charcoal)",
+                    opacity: 0.7,
+                    letterSpacing: "0.02em",
+                    whiteSpace: "pre-wrap",
+                    marginTop: "0.25rem"
+                  }
+                })
+              )
+            )
+          )
+        ),
+        React.createElement(
+          "section",
+          { style: { marginTop: "4.5rem" } },
+          React.createElement(
+            "p",
+            {
+              className: "font-display",
+              style: {
+                letterSpacing: "0.4em",
+                textTransform: "uppercase",
+                fontSize: "0.65rem",
+                color: "var(--charcoal)",
+                opacity: 0.4,
+                marginBottom: "1.25rem"
+              }
+            },
+            "Timeline"
+          ),
+          React.createElement(
+            "h3",
+            {
+              className: "font-heading",
+              style: {
+                fontWeight: 300,
+                fontSize: "1.15rem",
+                letterSpacing: "0.12em",
+                marginBottom: "1.75rem"
+              }
+            },
+            "作品時系列"
+          ),
+          React.createElement(
+            "ol",
+            {
+              style: {
+                listStyle: "none",
+                padding: 0,
+                margin: 0,
+                borderLeft: "1px solid hsl(0 0% 10% / 0.12)",
+                marginLeft: "0.35rem"
+              }
+            },
+            (meta.timeline || []).map((t, i) =>
+              React.createElement(
+                "li",
+                {
+                  key: i,
+                  style: {
+                    position: "relative",
+                    padding: "0 0 1.75rem 1.5rem"
+                  }
+                },
+                React.createElement("span", {
+                  style: {
+                    position: "absolute",
+                    left: "-4px",
+                    top: "0.35rem",
+                    width: "7px",
+                    height: "7px",
+                    borderRadius: "50%",
+                    background: "var(--wine)",
+                    opacity: 0.7
+                  }
+                }),
+                React.createElement(EditableText, {
+                  value: t.when,
+                  onChange: (v) => {
+                    const next = (meta.timeline || []).map((x, j) =>
+                      j === i ? { ...x, when: v } : x
+                    );
+                    updateMeta({ timeline: next });
+                  },
+                  style: {
+                    fontFamily: "var(--font-heading)",
+                    fontSize: "0.8rem",
+                    letterSpacing: "0.15em",
+                    color: "var(--wine)",
+                    opacity: 0.9,
+                    background: "transparent",
+                    border: "none",
+                    display: "block",
+                    marginBottom: "0.35rem"
+                  }
+                }),
+                React.createElement(EditableText, {
+                  value: t.event,
+                  onChange: (v) => {
+                    const next = (meta.timeline || []).map((x, j) =>
+                      j === i ? { ...x, event: v } : x
+                    );
+                    updateMeta({ timeline: next });
+                  },
+                  multiline: true,
+                  className: "font-body",
+                  style: {
+                    fontSize: "0.88rem",
+                    lineHeight: 1.85,
+                    color: "var(--charcoal)",
+                    opacity: 0.75,
+                    letterSpacing: "0.02em",
+                    whiteSpace: "pre-wrap"
+                  }
+                })
+              )
+            )
+          )
+        ),
+        React.createElement(EditableText, {
+          value: meta.note,
+          onChange: (v) => updateMeta({ note: v }),
+          multiline: true,
+          className: "font-body",
+          style: {
+            fontSize: "0.8rem",
+            lineHeight: 1.6,
+            color: "var(--charcoal)",
+            opacity: 0.45,
+            marginTop: "4rem",
+            letterSpacing: "0.02em",
+            whiteSpace: "pre-wrap"
+          }
+        }),
+        React.createElement(
+          "div",
+          {
+            style: {
+              marginTop: "4rem",
+              paddingTop: "2.5rem",
+              borderTop: "1px solid hsl(0 0% 10% / 0.1)"
+            }
+          },
+          React.createElement(
+            "a",
+            {
+              href: "#/contents",
+              style: {
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                fontFamily: "var(--font-heading)",
+                letterSpacing: "0.25em",
+                fontSize: "0.875rem",
+                color: "var(--charcoal)",
+                opacity: 0.8,
+                paddingBottom: "4px"
+              }
+            },
+            "目次へ",
+            React.createElement("span", {
+              style: {
+                height: "1px",
+                width: "2.5rem",
+                background: "var(--wine)"
+              }
+            })
+          )
+        )
+      )
+    )
+  );
+}
+
+function Contents() {
+  const { meta, chapters } = useContext(NovelContext);
+  return React.createElement(
+    "main",
+    { style: { minHeight: "100vh", background: "var(--offwhite)", color: "var(--charcoal)" } },
+    React.createElement(
+      "div",
+      { style: { maxWidth: "48rem", margin: "0 auto", padding: "5rem 1.5rem 7rem" } },
+      React.createElement(
+        "a",
+        {
+          href: "#/",
+          style: {
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            fontFamily: "var(--font-body)",
+            fontSize: "0.875rem",
+            color: "var(--charcoal)",
+            opacity: 0.5,
+            marginBottom: "4rem"
+          }
+        },
+        React.createElement(Icon, { w: 16, h: 16, d: ["m12 19-7-7 7-7", "M19 12H5"] }),
+        " 戻る"
+      ),
+      React.createElement(
+        "p",
+        {
+          className: "font-display",
+          style: {
+            letterSpacing: "0.4em",
+            textTransform: "uppercase",
+            fontSize: "0.65rem",
+            color: "var(--charcoal)",
+            opacity: 0.4,
+            marginBottom: "1.5rem"
+          }
+        },
+        "Table of Contents"
+      ),
+      React.createElement(
+        "h1",
+        {
+          className: "font-heading",
+          style: {
+            fontWeight: 300,
+            fontSize: "1.875rem",
+            letterSpacing: "0.1em",
+            marginBottom: "0.5rem"
+          }
+        },
+        meta.title
+      ),
+      React.createElement(
+        "p",
+        {
+          className: "font-display",
+          style: {
+            fontStyle: "italic",
+            color: "var(--charcoal)",
+            opacity: 0.5,
+            marginBottom: "3rem"
+          }
+        },
+        "全" + chapters.length + "話"
+      ),
+      React.createElement("div", {
+        style: { height: "1px", width: "3rem", background: "var(--wine)", marginBottom: "2.5rem" }
+      }),
+      React.createElement(
+        "nav",
+        {},
+        React.createElement(
+          "ul",
+          {},
+          chapters.map((ch) => {
+            const numStr = String(ch.num).padStart(2, "0");
+            return React.createElement(
+              "li",
+              { key: ch.num },
+              React.createElement(
+                "a",
+                {
+                  href: "#/read/" + ch.num,
+                  className: "toc-row",
+                  style: {
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: "1.25rem",
+                    padding: "1rem 0",
+                    borderBottom: "1px solid hsl(0 0% 10% / 0.1)",
+                    cursor: "pointer"
+                  }
+                },
+                React.createElement(
+                  "span",
+                  {
+                    className: "font-display",
+                    style: {
+                      fontSize: "0.875rem",
+                      color: "var(--charcoal)",
+                      opacity: 0.4,
+                      width: "2rem",
+                      flexShrink: 0
+                    }
+                  },
+                  numStr
+                ),
+                React.createElement(
+                  "span",
+                  {
+                    className: "font-body",
+                    style: {
+                      fontSize: "0.875rem",
+                      lineHeight: 1.4,
+                      color: "var(--charcoal)",
+                      opacity: 0.8,
+                      letterSpacing: "0.03em",
+                      flex: 1
+                    }
+                  },
+                  ch.title
+                )
+              )
+            );
+          })
+        )
+      ),
+      React.createElement(
+        "div",
+        {
+          style: {
+            marginTop: "4rem",
+            paddingTop: "2.5rem",
+            borderTop: "1px solid hsl(0 0% 10% / 0.1)"
+          }
+        },
+        React.createElement(
+          "a",
+          {
+            href: "#/",
+            style: {
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.75rem",
+              fontFamily: "var(--font-heading)",
+              letterSpacing: "0.25em",
+              fontSize: "0.875rem",
+              color: "var(--charcoal)",
+              opacity: 0.8,
+              paddingBottom: "4px"
+            }
+          },
+          "表紙へ",
+          React.createElement("span", {
+            style: { height: "1px", width: "2.5rem", background: "var(--wine)" }
+          })
+        )
+      )
+    )
+  );
+}
+
+function Read({ route }) {
+  const { meta, chapters, updateChapterTitle, updateChapterBody, editing } = useContext(NovelContext);
+  const match = route.match(/^\/read\/(\d+)$/);
+  const num = match ? match[1] : null;
+  const chapter = useMemo(
+    () => chapters.find((c) => c.num === Number(num)),
+    [chapters, num]
+  );
+  const [fontIndex, setFontIndex] = useState(() => {
+    const s = Number(localStorage.getItem("novelblank:fontIndex"));
+    return Number.isFinite(s) ? Math.min(SIZES.length - 1, Math.max(0, s)) : 2;
+  });
+  const [dark, setDark] = useState(() => localStorage.getItem("novelblank:dark") === "1");
+  const [progress, setProgress] = useState(0);
+  useEffect(() => {
+    localStorage.setItem("novelblank:fontIndex", String(fontIndex));
+  }, [fontIndex]);
+  useEffect(() => {
+    localStorage.setItem("novelblank:dark", dark ? "1" : "0");
+  }, [dark]);
+  useEffect(() => {
+    const r = document.documentElement;
+    if (dark) r.classList.add("dark");
+    else r.classList.remove("dark");
+    return () => r.classList.remove("dark");
+  }, [dark]);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+    setProgress(0);
+  }, [num]);
+  useEffect(() => {
+    const onScroll = () => {
+      const doc = document.documentElement;
+      const max = doc.scrollHeight - doc.clientHeight;
+      setProgress(max > 0 ? Math.min(1, Math.max(0, doc.scrollTop / max)) : 0);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [num]);
+
+  if (!chapter) {
+    return React.createElement(
+      "main",
+      {
+        style: {
+          minHeight: "100vh",
+          background: "var(--offwhite)",
+          color: "var(--charcoal)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 1.5rem"
+        }
+      },
+      React.createElement(
+        "div",
+        { style: { textAlign: "center" } },
+        React.createElement(
+          "p",
+          {
+            className: "font-heading",
+            style: { fontSize: "1.5rem", letterSpacing: "0.1em", marginBottom: "1.5rem" }
+          },
+          "話が見つかりません"
+        ),
+        React.createElement(
+          "a",
+          {
+            href: "#/contents",
+            style: {
+              fontFamily: "var(--font-body)",
+              fontSize: "0.875rem",
+              color: "var(--charcoal)",
+              opacity: 0.6
+            }
+          },
+          "目次へ戻る"
+        )
+      )
+    );
+  }
+
+  const fontSize = SIZES[fontIndex].value;
+  const totalChapters = chapters.length;
+  const prev = chapter.num > 1 ? chapter.num - 1 : null;
+  const next = chapter.num < totalChapters ? chapter.num + 1 : null;
+  const numStr = String(chapter.num).padStart(2, "0");
+  const nextChapter = next ? chapters.find((c) => c.num === next) : null;
+
+  return React.createElement(
+    "main",
+    {
+      style: {
+        position: "relative",
+        minHeight: "100vh",
+        background: "hsl(var(--background))",
+        color: "hsl(var(--foreground))"
+      }
+    },
+    React.createElement(
+      "header",
+      {
+        style: {
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+          background: "hsl(var(--background) / 0.85)",
+          backdropFilter: "blur(8px)",
+          borderBottom: "1px solid hsl(var(--border) / 0.4)"
+        }
+      },
+      React.createElement(
+        "div",
+        {
+          style: {
+            maxWidth: "42rem",
+            margin: "0 auto",
+            padding: "0 1.25rem",
+            height: "3.5rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "0.75rem"
+          }
+        },
+        React.createElement(
+          "a",
+          {
+            href: "#/contents",
+            style: {
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              fontFamily: "var(--font-body)",
+              fontSize: "0.75rem",
+              color: "hsl(var(--muted-foreground))",
+              flexShrink: 0
+            }
+          },
+          React.createElement(Icon, {
+            w: 14,
+            h: 14,
+            d: ["M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"]
+          }),
+          React.createElement("span", { className: "sm-inline" }, "目次")
+        ),
+        React.createElement(
+          "span",
+          {
+            className: "font-display",
+            style: {
+              fontSize: "0.75rem",
+              letterSpacing: "0.3em",
+              color: "hsl(var(--muted-foreground))",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap"
+            }
+          },
+          meta.title || ""
+        ),
+        React.createElement(ReadingControls, { fontIndex, setFontIndex, dark, setDark })
+      ),
+      React.createElement(
+        "div",
+        {
+          style: {
+            height: "1px",
+            width: "100%",
+            background: "hsl(var(--border) / 0.4)"
+          }
+        },
+        React.createElement("div", {
+          style: {
+            height: "100%",
+            background: "var(--wine)",
+            transformOrigin: "left",
+            width: progress * 100 + "%",
+            transition: "width 150ms ease-out"
+          }
+        })
+      )
+    ),
+    React.createElement(
+      "article",
+      { style: { maxWidth: "42rem", margin: "0 auto", padding: "4rem 1.5rem 6rem" } },
+      React.createElement(
+        "div",
+        { style: { textAlign: "center", marginBottom: "4rem" } },
+        React.createElement(
+          "p",
+          {
+            className: "font-display",
+            style: {
+              letterSpacing: "0.4em",
+              textTransform: "uppercase",
+              fontSize: "0.65rem",
+              color: "hsl(var(--muted-foreground))",
+              marginBottom: "1.25rem"
+            }
+          },
+          "Chapter " + numStr
+        ),
+        React.createElement(
+          "h1",
+          {
+            className: "font-heading",
+            style: {
+              fontWeight: 300,
+              fontSize: "1.5rem",
+              lineHeight: 1.6,
+              letterSpacing: "0.08em",
+              color: "hsl(var(--foreground))"
+            }
+          },
+          React.createElement(EditableText, {
+            value: chapter.title,
+            onChange: (v) => updateChapterTitle(chapter.num, v),
+            style: {
+              background: editing ? "hsl(var(--accent) / 0.06)" : "transparent",
+              border: editing ? "1px dashed hsl(var(--accent) / 0.35)" : "none",
+              textAlign: "center",
+              fontWeight: 300,
+              letterSpacing: "0.08em",
+              fontSize: "inherit",
+              width: "100%",
+              color: "inherit"
+            }
+          })
+        ),
+        React.createElement("div", {
+          style: {
+            margin: "2rem auto 0",
+            height: "1px",
+            width: "2.5rem",
+            background: "var(--wine)"
+          }
+        })
+      ),
+      React.createElement(
+        "div",
+        {
+          className: "novel-text",
+          style: { fontSize, color: "hsl(var(--foreground) / 0.88)" }
+        },
+        editing
+          ? React.createElement("textarea", {
+              value: (chapter.paragraphs || []).join("\n\n"),
+              onChange: (e) => updateChapterBody(chapter.num, e.target.value),
+              style: {
+                display: "block",
+                width: "100%",
+                font: "inherit",
+                fontFamily: "var(--font-body)",
+                fontSize: "inherit",
+                lineHeight: 1.95,
+                letterSpacing: "0.04em",
+                color: "inherit",
+                background: "hsl(var(--accent) / 0.06)",
+                border: "1px dashed hsl(var(--accent) / 0.35)",
+                borderRadius: "2px",
+                padding: "0",
+                margin: "0",
+                minHeight: "70vh",
+                resize: "vertical",
+                boxSizing: "border-box",
+                outline: "none",
+                whiteSpace: "pre-wrap",
+                textAlign: "start",
+                overflowWrap: "break-word",
+                wordBreak: "normal"
+              },
+              rows: Math.max(20, (chapter.paragraphs || []).length * 3)
+            })
+          : (chapter.paragraphs || []).map((p, i) => {
+              const isDialogue = typeof p === "string" && p.trimStart().startsWith("「");
+              return React.createElement(
+                "p",
+                {
+                  key: i,
+                  style: isDialogue ? { textIndent: 0 } : undefined,
+                  className: isDialogue ? "dialogue" : undefined
+                },
+                p
+              );
+            })
+      ),
+      React.createElement(
+        "div",
+        { style: { marginTop: "5rem" } },
+        React.createElement(
+          "div",
+          {
+            style: {
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "0.75rem",
+              color: "hsl(var(--muted-foreground) / 0.5)"
+            }
+          },
+          React.createElement("span", {
+            style: { height: "1px", width: "2rem", background: "currentColor" }
+          }),
+          React.createElement(
+            "span",
+            {
+              className: "font-display",
+              style: { fontSize: "0.75rem", letterSpacing: "0.3em" }
+            },
+            numStr + " / " + String(totalChapters).padStart(2, "0")
+          ),
+          React.createElement("span", {
+            style: { height: "1px", width: "2rem", background: "currentColor" }
+          })
+        ),
+        React.createElement(
+          "div",
+          {
+            style: {
+              marginTop: "2.5rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "1rem"
+            }
+          },
+          prev
+            ? React.createElement(
+                "a",
+                {
+                  href: "#/read/" + prev,
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    fontFamily: "var(--font-body)",
+                    fontSize: "0.875rem",
+                    color: "hsl(var(--muted-foreground))"
+                  }
+                },
+                React.createElement(Icon, { w: 16, h: 16, d: ["m15 18-6-6 6-6"] }),
+                React.createElement("span", { className: "sm-inline" }, "前話")
+              )
+            : React.createElement("span", { style: { width: "3rem" } }),
+          React.createElement(
+            "a",
+            {
+              href: "#/contents",
+              style: {
+                fontFamily: "var(--font-body)",
+                fontSize: "0.75rem",
+                letterSpacing: "0.2em",
+                color: "hsl(var(--muted-foreground))"
+              }
+            },
+            "目次"
+          ),
+          next
+            ? React.createElement(
+                "a",
+                {
+                  href: "#/read/" + next,
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    fontFamily: "var(--font-body)",
+                    fontSize: "0.875rem",
+                    color: "hsl(var(--muted-foreground))"
+                  }
+                },
+                React.createElement("span", { className: "sm-inline" }, "次話"),
+                React.createElement(Icon, { w: 16, h: 16, d: ["m9 18 6-6-6-6"] })
+              )
+            : React.createElement("span", { style: { width: "3rem" } })
+        ),
+        next &&
+          nextChapter &&
+          React.createElement(
+            "p",
+            {
+              style: {
+                marginTop: "1.5rem",
+                textAlign: "center",
+                fontFamily: "var(--font-body)",
+                fontSize: "0.75rem",
+                color: "hsl(var(--muted-foreground) / 0.7)",
+                letterSpacing: "0.05em"
+              }
+            },
+            nextChapter.title
+          ),
+        !next &&
+          React.createElement(
+            "p",
+            {
+              style: {
+                marginTop: "1.5rem",
+                textAlign: "center",
+                fontFamily: "var(--font-heading)",
+                fontSize: "0.875rem",
+                letterSpacing: "0.2em",
+                color: "hsl(var(--muted-foreground) / 0.7)"
+              }
+            },
+            "── 完 ──"
+          )
+      )
+    )
+  );
+}
+
+function App() {
+  const route = useHashRoute();
+  const [meta, setMeta] = useState(() => ({ ...defaultNovelMeta }));
+  const [chapters, setChapters] = useState(() =>
+    defaultChapters.map((c) => ({ ...c, paragraphs: [...c.paragraphs] }))
+  );
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+
+  useEffect(() => {
+    if (!auth) {
+      setAuthReady(true);
+      return;
+    }
+    const unsub = auth.onAuthStateChanged((u) => {
+      setUser(u);
+      setAuthReady(true);
+      if (!u) setEditing(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // まずローカルのデフォルトで画面を出し、Firestore は裏で同期する
+  useEffect(() => {
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    try {
+      const raw = localStorage.getItem("novelblank:chapters");
+      if (raw) {
+        const localChs = JSON.parse(raw);
+        if (Array.isArray(localChs) && localChs.length > 0) {
+          setChapters(
+            localChs.map((c) => ({
+              ...c,
+              paragraphs: Array.isArray(c.paragraphs) ? [...c.paragraphs] : []
+            }))
+          );
+          console.info("Loaded chapters from localStorage");
+        }
+      }
+    } catch (e) {
+      console.warn("localStorage chapters load failed", e);
+    }
+
+    const applyData = (data) => {
+      if (!data) return;
+      if (data.meta) {
+        setMeta({
+          ...defaultNovelMeta,
+          ...data.meta,
+          characters: data.meta.characters || defaultNovelMeta.characters,
+          timeline: data.meta.timeline || defaultNovelMeta.timeline
+        });
+      }
+      if (data.chapters && Array.isArray(data.chapters) && data.chapters.length > 0) {
+        setChapters(
+          data.chapters.map((c) => ({
+            ...c,
+            paragraphs: Array.isArray(c.paragraphs) ? [...c.paragraphs] : []
+          }))
+        );
+        try { localStorage.setItem("novelblank:chapters", JSON.stringify(data.chapters)); } catch (e) {}
+      }
+    };
+
+    (async () => {
+      try {
+        const data = await loadNovelViaRest();
+        if (cancelled) return;
+        if (data) {
+          applyData(data);
+          console.info("Firestore REST data loaded");
+          return;
+        }
+        console.info("No Firestore doc via REST — using defaults");
+      } catch (restErr) {
+        console.warn("REST load failed, trying SDK:", restErr);
+      }
+      try {
+        if (!db) return;
+        const snap = await Promise.race([
+          db.collection(STORAGE_COLLECTION).doc(STORAGE_DOC).get(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Firestore timeout")), 8000)
+          )
+        ]);
+        if (cancelled) return;
+        if (snap && snap.exists) {
+          applyData(snap.data());
+          console.info("Firestore SDK data loaded");
+        }
+      } catch (err) {
+        console.warn("Firebase load failed, using defaults:", err);
+        if (!cancelled) setLoadError(String(err && err.message ? err.message : err));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const markDirty = useCallback(() => setDirty(true), []);
+
+  const updateMeta = useCallback((partial) => {
+    setMeta((m) => ({ ...m, ...partial }));
+    setDirty(true);
+  }, []);
+
+  const updateChapterTitle = useCallback((num, title) => {
+    setChapters((chs) =>
+      chs.map((c) => (c.num === num ? { ...c, title } : c))
+    );
+    setDirty(true);
+  }, []);
+
+  const updateChapterBody = useCallback((num, text) => {
+    // 空行（2つ以上の改行）で段落分割。全文を一括編集できる
+    const cleaned = String(text || "")
+      .replace(/\r\n/g, "\n")
+      .split(/\n\n+/)
+      .map((s) => s.replace(/^\n+|\n+$/g, ""))
+      .filter((s) => s.length > 0);
+    setChapters((chs) =>
+      chs.map((c) => (c.num === num ? { ...c, paragraphs: cleaned } : c))
+    );
+    setDirty(true);
+  }, []);
+
+  const saveToFirebase = useCallback(async () => {
+    if (!auth || !auth.currentUser) {
+      alert("保存するにはログインが必要です。EDIT からログインしてください。");
+      setShowLogin(true);
+      return;
+    }
+    setSaving(true);
+    try {
+      localStorage.setItem("novelblank:chapters", JSON.stringify(chapters));
+      localStorage.setItem("novelblank:meta", JSON.stringify(meta));
+      console.info("Saved chapters to localStorage");
+    } catch (lsErr) {
+      console.warn("localStorage save failed:", lsErr);
+    }
+    
+    const payload = {
+      meta: meta,
+      chapters: chapters,
+      updatedAt: new Date().toISOString()
+    };
+    try {
+      const idToken = await auth.currentUser.getIdToken();
+      try {
+        await saveNovelViaRest(payload, idToken);
+        setDirty(false);
+        console.info("Saved via REST");
+        return;
+      } catch (restErr) {
+        console.warn("REST save failed, trying SDK:", restErr);
+      }
+      if (!db) throw new Error("Firestore に接続できません");
+      await db.collection(STORAGE_COLLECTION).doc(STORAGE_DOC).set({
+        meta: meta,
+        chapters: chapters,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setDirty(false);
+      console.info("Saved via SDK");
+    } catch (err) {
+      console.error("Save failed:", err);
+      setDirty(false);
+      alert("クラウド保存に失敗しました（端末内には保存済み）: " + (err && err.message ? err.message : err));
+    } finally {
+      setSaving(false);
+    }
+  }, [meta, chapters]);
+
+  const logout = useCallback(async () => {
+    try {
+      if (auth) await auth.signOut();
+      setEditing(false);
+      setShowLogin(false);
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
+  }, []);
+
+  const ctx = {
+    meta,
+    chapters,
+    editing,
+    setEditing,
+    saving,
+    dirty,
+    updateMeta,
+    updateChapterTitle,
+    updateChapterBody,
+    saveToFirebase,
+    user,
+    showLogin,
+    setShowLogin,
+    logout
+  };
+
+  let page;
+  if (!loaded) {
+    page = React.createElement(
+      "main",
+      {
+        style: {
+          minHeight: "100vh",
+          background: "var(--charcoal)",
+          color: "var(--offwhite)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }
+      },
+      React.createElement(
+        "p",
+        {
+          className: "font-display",
+          style: { letterSpacing: "0.3em", fontSize: "0.85rem", opacity: 0.6 }
+        },
+        "Loading…"
+      )
+    );
+  } else if (route === "/" || route === "") {
+    page = React.createElement(Home);
+  } else if (route === "/contents") {
+    page = React.createElement(Contents);
+  } else if (route.startsWith("/read/")) {
+    page = React.createElement(Read, { route });
+  } else {
+    page = React.createElement(
+      "main",
+      {
+        style: {
+          minHeight: "100vh",
+          background: "var(--offwhite)",
+          color: "var(--charcoal)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 1.5rem"
+        }
+      },
+      React.createElement(
+        "div",
+        { style: { textAlign: "center" } },
+        React.createElement(
+          "p",
+          {
+            className: "font-heading",
+            style: { fontSize: "1.5rem", letterSpacing: "0.1em", marginBottom: "1.5rem" }
+          },
+          "ページが見つかりません"
+        ),
+        React.createElement(
+          "a",
+          {
+            href: "#/",
+            style: {
+              fontFamily: "var(--font-body)",
+              fontSize: "0.875rem",
+              color: "var(--charcoal)",
+              opacity: 0.6
+            }
+          },
+          "表紙へ戻る"
+        )
+      )
+    );
+  }
+
+  return React.createElement(
+    NovelContext.Provider,
+    { value: ctx },
+    React.createElement(
+      React.Fragment,
+      null,
+      page,
+      React.createElement(PageFlash),
+      loaded && React.createElement(EditToolbar)
+    )
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+
+</body>
+</html>
