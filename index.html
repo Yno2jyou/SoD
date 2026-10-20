@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Noto+Serif+JP:wght@300;400;500;600&display=swap" rel="stylesheet" />
-<title>無題</title>
+<title>Speak or Die</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -301,6 +301,10 @@ function TitleAssemble({ text, charDelay = 70 }) {
   }, [text]);
   const nodes = [];
   chars.forEach((ch, i) => {
+    if (ch === "\n") {
+      nodes.push(React.createElement("br", { key: "nl" + i, "aria-hidden": "true" }));
+      return;
+    }
     const h = (i * 9301 + 233) % 233280;
     const n = h / 233280;
     const dx = (n - 0.5) * 40,
@@ -802,8 +806,36 @@ function EditToolbar() {
   );
 }
 
-function EditableText({ value, onChange, multiline, style, className, as }) {
+function EditableText({ value, onChange, multiline, lines, style, className, as }) {
   const { editing } = useContext(NovelContext);
+  // lines: 改行を含められる短いテキスト（タイトル等）。改行はそのまま表示される
+  if (lines) {
+    if (!editing) {
+      return React.createElement("span", { className, style: { whiteSpace: "pre-line", ...style } }, value);
+    }
+    return React.createElement("textarea", {
+      value: value || "",
+      onChange: (e) => onChange(e.target.value),
+      rows: Math.max(1, (value || "").split("\n").length),
+      className,
+      style: {
+        font: "inherit",
+        color: "inherit",
+        letterSpacing: "inherit",
+        lineHeight: "inherit",
+        background: "hsl(var(--accent) / 0.06)",
+        border: "1px dashed hsl(var(--accent) / 0.35)",
+        borderRadius: "2px",
+        padding: "0.15rem 0.35rem",
+        width: "100%",
+        boxSizing: "border-box",
+        resize: "none",
+        overflow: "hidden",
+        outline: "none",
+        ...style
+      }
+    });
+  }
   const Tag = as || (multiline ? "textarea" : "input");
   if (!editing) {
     if (multiline) {
@@ -940,6 +972,7 @@ function Home() {
           },
           editing
             ? React.createElement(EditableText, {
+                lines: true,
                 value: meta.title,
                 onChange: (v) => updateMeta({ title: v }),
                 style: {
@@ -1097,6 +1130,7 @@ function Home() {
             }
           },
           React.createElement(EditableText, {
+            lines: true,
             value: meta.title,
             onChange: (v) => updateMeta({ title: v }),
             style: { background: "transparent", border: "none", fontWeight: 300, letterSpacing: "0.1em", width: "100%" }
@@ -1503,7 +1537,8 @@ function Contents() {
             fontWeight: 300,
             fontSize: "1.875rem",
             letterSpacing: "0.1em",
-            marginBottom: "0.5rem"
+            marginBottom: "0.5rem",
+            whiteSpace: "pre-line"
           }
         },
         meta.title
@@ -1778,7 +1813,7 @@ function Read({ route }) {
               whiteSpace: "nowrap"
             }
           },
-          meta.title || ""
+          (meta.title || "").replace(/\n/g, " ")
         ),
         React.createElement(ReadingControls, { fontIndex, setFontIndex, dark, setDark })
       ),
