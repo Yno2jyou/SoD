@@ -141,6 +141,9 @@ const defaultNovelMeta = {
     }
   ]
 };
+// true の間は、保存済みデータ(localStorage/Firestore)を読まず、埋め込み本文を常に表示する。
+// EDITでログインして保存し直したあと false にすると、通常の同期動作に戻る。
+const FORCE_EMBEDDED = true;
 const defaultChapters = [
  {
   "num": 1,
@@ -3491,6 +3494,7 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (FORCE_EMBEDDED) { console.info("FORCE_EMBEDDED: using embedded text"); return; }
     let cancelled = false;
 
     try {
