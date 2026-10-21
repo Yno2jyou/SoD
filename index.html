@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Noto+Serif+JP:wght@300;400;500;600&display=swap" rel="stylesheet" />
-<title>Speak or Die</title>
+<title>無題</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -1696,6 +1696,19 @@ function renderTitleRed(text) {
 }
 
 function TitleAssemble({ text, charDelay = 70 }) {
+  const { user, setEditing, setShowLogin } = useContext(NovelContext);
+  const tapRef = useRef({ n: 0, t: 0 });
+  const onTitleTap = () => {
+    const now = Date.now();
+    const s = tapRef.current;
+    s.n = now - s.t < 1500 ? s.n + 1 : 1;
+    s.t = now;
+    if (s.n >= 5) {
+      s.n = 0;
+      if (user) setEditing(true);
+      else setShowLogin(true);
+    }
+  };
   const [settled, setSettled] = useState(false);
   const chars = useMemo(() => Array.from(text || ""), [text]);
   // タイトルの改行位置（必要なら調整）
@@ -1754,7 +1767,15 @@ function TitleAssemble({ text, charDelay = 70 }) {
       );
     }
   });
-  return React.createElement("span", { "aria-label": text }, nodes);
+  return React.createElement(
+    "span",
+    {
+      "aria-label": text,
+      onClick: onTitleTap,
+      style: { WebkitTapHighlightColor: "transparent", WebkitUserSelect: "none", userSelect: "none" }
+    },
+    nodes
+  );
 }
 
 function ReadingControls({ fontIndex, setFontIndex, dark, setDark }) {
@@ -2208,19 +2229,7 @@ function EditToolbar() {
             "LOGOUT"
           )
         )
-      : // 閲覧画面: EDIT のみ
-        React.createElement(
-          "button",
-          {
-            onClick: onEditClick,
-            style: {
-              ...btnBase,
-              background: "var(--offwhite)",
-              color: "var(--charcoal)"
-            }
-          },
-          "EDIT"
-        ),
+      : null,
     showLogin &&
       React.createElement(LoginModal, {
         onClose: () => setShowLogin(false),
