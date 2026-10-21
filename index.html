@@ -2083,6 +2083,99 @@ function LoginModal({ onClose, onSuccess }) {
   );
 }
 
+function BgmControl() {
+  const BGM_SRC = "Towards_the_Sea.mp3";
+  const audioRef = useRef(null);
+  const [on, setOn] = useState(false);
+  const [vol, setVol] = useState(() => {
+    try { const v = parseFloat(localStorage.getItem("novelblank:bgmVol")); return isNaN(v) ? 0.5 : v; } catch (e) { return 0.5; }
+  });
+  const [open, setOpen] = useState(false);
+  const wantOn = useRef(false);
+  try { wantOn.current = wantOn.current || localStorage.getItem("novelblank:bgm") === "1"; } catch (e) {}
+
+  useEffect(() => {
+    const a = new Audio(BGM_SRC);
+    a.loop = true;
+    a.preload = "auto";
+    a.volume = vol;
+    audioRef.current = a;
+    const tryStart = () => {
+      if (!wantOn.current) return;
+      a.play().then(() => setOn(true)).catch(() => {});
+    };
+    tryStart();
+    const onFirst = () => { tryStart(); };
+    window.addEventListener("pointerdown", onFirst, { once: true });
+    return () => { window.removeEventListener("pointerdown", onFirst); a.pause(); };
+  }, []);
+
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.volume = vol;
+    try { localStorage.setItem("novelblank:bgmVol", String(vol)); } catch (e) {}
+  }, [vol]);
+
+  const toggle = () => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (on) {
+      a.pause(); setOn(false); wantOn.current = false;
+      try { localStorage.setItem("novelblank:bgm", "0"); } catch (e) {}
+    } else {
+      a.play().then(() => {
+        setOn(true); wantOn.current = true;
+        try { localStorage.setItem("novelblank:bgm", "1"); } catch (e) {}
+      }).catch(() => {});
+    }
+  };
+
+  const svg = (children) => React.createElement("svg", {
+    width: 22, height: 22, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor",
+    strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true"
+  }, children);
+  const speaker = React.createElement("path", { d: "M4 9.5h3.2L12 5.5v13l-4.8-4H4z" });
+  const icon = on
+    ? svg([speaker,
+        React.createElement("path", { key: "w1", d: "M15.2 9.2a4 4 0 0 1 0 5.6" }),
+        React.createElement("path", { key: "w2", d: "M17.8 6.8a7.5 7.5 0 0 1 0 10.4" })])
+    : svg([speaker,
+        React.createElement("path", { key: "x", d: "M16 9.5l5 5M21 9.5l-5 5" })]);
+
+  return React.createElement(
+    "div",
+    {
+      onMouseEnter: () => setOpen(true),
+      onMouseLeave: () => setOpen(false),
+      style: {
+        position: "fixed", left: "0.9rem", bottom: "0.9rem", zIndex: 60,
+        display: "flex", alignItems: "center", gap: "0.5rem",
+        color: "hsl(var(--foreground) / 0.65)"
+      }
+    },
+    React.createElement("button", {
+      onClick: toggle,
+      "aria-label": on ? "BGMを止める" : "BGMを流す",
+      title: on ? "BGM オフ" : "BGM オン",
+      style: {
+        width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center",
+        justifyContent: "center", background: "hsl(var(--background) / 0.7)",
+        border: "1px solid hsl(var(--border) / 0.6)", color: "inherit", cursor: "pointer",
+        backdropFilter: "blur(4px)"
+      }
+    }, icon),
+    React.createElement("input", {
+      type: "range", min: 0, max: 1, step: 0.01, value: vol,
+      onChange: (e) => setVol(parseFloat(e.target.value)),
+      onFocus: () => setOpen(true), onBlur: () => setOpen(false),
+      "aria-label": "BGMの音量",
+      style: {
+        width: open ? 84 : 0, opacity: open ? 1 : 0, transition: "width 0.4s cubic-bezier(0.22,1,0.36,1), opacity 0.3s",
+        accentColor: "currentColor", cursor: "pointer"
+      }
+    })
+  );
+}
+
 function EditToolbar() {
   const {
     editing,
@@ -3774,6 +3867,7 @@ function App() {
       React.Fragment,
       null,
       React.createElement(PageTransition, { routeKey: route.startsWith("/read/") ? route : (route === "" ? "/" : route) }, page),
+      React.createElement(BgmControl),
       loaded && React.createElement(EditToolbar)
     )
   );
