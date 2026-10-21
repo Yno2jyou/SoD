@@ -3497,6 +3497,16 @@ function App() {
     let cancelled = false;
 
     try {
+      if (localStorage.getItem("novelblank:embedVer") === EMBED_VERSION) {
+        const rawMeta = localStorage.getItem("novelblank:meta");
+        if (rawMeta) {
+          const lm = JSON.parse(rawMeta);
+          if (lm && typeof lm === "object") setMeta({ ...defaultNovelMeta, ...lm });
+        }
+      }
+    } catch (e) { console.warn("localStorage meta load failed", e); }
+
+    try {
       const raw = localStorage.getItem("novelblank:embedVer") === EMBED_VERSION ? localStorage.getItem("novelblank:chapters") : null;
       if (raw) {
         const localChs = JSON.parse(raw);
@@ -3626,7 +3636,7 @@ function App() {
       try {
         await saveNovelViaRest(payload, idToken);
         setDirty(false);
-        console.info("Saved via REST");
+        console.info("Saved via REST"); alert("クラウドに保存しました");
         return;
       } catch (restErr) {
         console.warn("REST save failed, trying SDK:", restErr);
