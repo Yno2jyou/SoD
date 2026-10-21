@@ -1682,6 +1682,19 @@ const Icon = ({ w, h, d, props }) =>
     d.map((p, i) => React.createElement("path", { key: i, d: p }))
   );
 
+const TITLE_RED = "#c0141c";
+function redRange(text) {
+  const s = text || "";
+  const i = s.lastIndexOf("死ね");
+  return i < 0 ? null : [i, i + 2];
+}
+function renderTitleRed(text) {
+  const s = text || "";
+  const r = redRange(s);
+  if (!r) return s;
+  return [s.slice(0, r[0]), React.createElement("span", { key: "red", style: { color: TITLE_RED } }, s.slice(r[0], r[1])), s.slice(r[1])];
+}
+
 function TitleAssemble({ text, charDelay = 70 }) {
   const [settled, setSettled] = useState(false);
   const chars = useMemo(() => Array.from(text || ""), [text]);
@@ -1696,6 +1709,13 @@ function TitleAssemble({ text, charDelay = 70 }) {
     return () => clearTimeout(t);
   }, [text]);
   const nodes = [];
+  const redIdx = (() => {
+    const s = chars.join("");
+    const k = s.lastIndexOf("死ね");
+    if (k < 0) return null;
+    const start = Array.from(s.slice(0, k)).length;
+    return [start, start + 2];
+  })();
   chars.forEach((ch, i) => {
     if (ch === "\n") {
       nodes.push(React.createElement("br", { key: "nl" + i, "aria-hidden": "true" }));
@@ -1716,6 +1736,7 @@ function TitleAssemble({ text, charDelay = 70 }) {
             "--dx": dx + "px",
             "--dy": dy + "px",
             "--dr": dr + "deg",
+            ...(redIdx && i >= redIdx[0] && i < redIdx[1] ? { color: TITLE_RED } : {}),
             transitionDelay: i * charDelay + "ms"
           },
           "aria-hidden": "true"
@@ -2946,7 +2967,7 @@ function Contents() {
             whiteSpace: "pre-line"
           }
         },
-        meta.title
+        renderTitleRed(meta.title)
       ),
       React.createElement(
         "p",
