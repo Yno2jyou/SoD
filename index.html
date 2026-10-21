@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Noto+Serif+JP:wght@300;400;500;600&display=swap" rel="stylesheet" />
-<title>無題</title>
+<title>Speak or Die</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -141,9 +141,9 @@ const defaultNovelMeta = {
     }
   ]
 };
-// true の間は、保存済みデータ(localStorage/Firestore)を読まず、埋め込み本文を常に表示する。
-// EDITでログインして保存し直したあと false にすると、通常の同期動作に戻る。
-const FORCE_EMBEDDED = true;
+// 古い保存データが埋め込み本文を上書きしないよう、版が一致する保存データだけ読み込む。
+// EDITで一度保存すれば、以降は編集内容がそのまま保持される。
+const EMBED_VERSION = "2026-10-21"; // 埋め込み本文の版。この版で保存されたデータだけが読み込まれる
 const defaultChapters = [
  {
   "num": 1,
@@ -3494,11 +3494,10 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (FORCE_EMBEDDED) { console.info("FORCE_EMBEDDED: using embedded text"); return; }
     let cancelled = false;
 
     try {
-      const raw = localStorage.getItem("novelblank:chapters");
+      const raw = localStorage.getItem("novelblank:embedVer") === EMBED_VERSION ? localStorage.getItem("novelblank:chapters") : null;
       if (raw) {
         const localChs = JSON.parse(raw);
         if (Array.isArray(localChs) && localChs.length > 0) {
@@ -3517,6 +3516,7 @@ function App() {
 
     const applyData = (data) => {
       if (!data) return;
+      if (!data.meta || data.meta.embeddedVersion !== EMBED_VERSION) return;
       if (data.meta) {
         setMeta({
           ...defaultNovelMeta,
@@ -3609,6 +3609,7 @@ function App() {
     setSaving(true);
     try {
       localStorage.setItem("novelblank:chapters", JSON.stringify(chapters));
+      localStorage.setItem("novelblank:embedVer", EMBED_VERSION);
       localStorage.setItem("novelblank:meta", JSON.stringify(meta));
       console.info("Saved chapters to localStorage");
     } catch (lsErr) {
@@ -3616,7 +3617,7 @@ function App() {
     }
     
     const payload = {
-      meta: meta,
+      meta: { ...meta, embeddedVersion: EMBED_VERSION },
       chapters: chapters,
       updatedAt: new Date().toISOString()
     };
@@ -3632,7 +3633,7 @@ function App() {
       }
       if (!db) throw new Error("Firestore に接続できません");
       await db.collection(STORAGE_COLLECTION).doc(STORAGE_DOC).set({
-        meta: meta,
+        meta: { ...meta, embeddedVersion: EMBED_VERSION },
         chapters: chapters,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
