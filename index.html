@@ -58,6 +58,17 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 ul{list-style:none}
 @media(min-width:640px){.sm-inline{display:inline!important}}
 </style>
+<script>
+window.addEventListener("error", function (e) {
+  var r = document.getElementById("root");
+  if (r && !r.children.length) {
+    var pre = document.createElement("pre");
+    pre.style.cssText = "white-space:pre-wrap;padding:1.5rem;font-size:12px;color:#fff;background:#400;min-height:100vh";
+    pre.textContent = "読み込みエラー: " + (e.message || e.error) + (e.filename ? "\n" + e.filename + ":" + e.lineno : "");
+    document.body.appendChild(pre);
+  }
+});
+</script>
 </head>
 <body>
 <div id="root"></div>
@@ -4187,7 +4198,18 @@ function App() {
 }
 
 
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+class ErrorBoundary extends React.Component {
+  constructor(p) { super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  render() {
+    if (this.state.err) {
+      return React.createElement("pre", { style: { whiteSpace: "pre-wrap", padding: "1.5rem", fontSize: "12px", color: "#fff", background: "#400", minHeight: "100vh" } },
+        "表示中にエラーが起きました:\n" + String(this.state.err && (this.state.err.stack || this.state.err.message || this.state.err)));
+    }
+    return this.props.children;
+  }
+}
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(ErrorBoundary, null, React.createElement(App)));
 </script>
 
 </body>
