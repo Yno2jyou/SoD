@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300&family=Noto+Serif+JP:wght@300;400;500;600&display=swap" rel="stylesheet" />
-<title>BOOKSHELF</title>
+<title>無題</title>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -58,17 +58,6 @@ button{font-family:inherit;cursor:pointer;border:none;background:none;color:inhe
 ul{list-style:none}
 @media(min-width:640px){.sm-inline{display:inline!important}}
 </style>
-<script>
-window.addEventListener("error", function (e) {
-  var r = document.getElementById("root");
-  if (r && !r.children.length) {
-    var pre = document.createElement("pre");
-    pre.style.cssText = "white-space:pre-wrap;padding:1.5rem;font-size:12px;color:#fff;background:#400;min-height:100vh";
-    pre.textContent = "読み込みエラー: " + (e.message || e.error) + (e.filename ? "\n" + e.filename + ":" + e.lineno : "");
-    document.body.appendChild(pre);
-  }
-});
-</script>
 </head>
 <body>
 <div id="root"></div>
@@ -86,18 +75,14 @@ window.addEventListener("error", function (e) {
   }, {passive:false});
 })();
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
-<script>window.React||document.write('<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"><\/script>')</script>
-<script>window.React||document.write('<script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"><\/script>')</script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
-<script>window.ReactDOM||document.write('<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"><\/script>')</script>
-<script>window.ReactDOM||document.write('<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"><\/script>')</script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script>
 const defaultNovelMeta = {
-  "quote": "君が死んだら、僕も死ぬよ。",
   "title": "語れ、さもなくば死ね",
   "titleEn": "Speak or die",
   "subtitle": "A LITERARY WORK",
@@ -1512,11 +1497,15 @@ const defaultChapters = [
 ];
 
 </script>
-<script>
-if (!window.React || !window.ReactDOM) { document.getElementById("root").innerHTML = '<p style="padding:2rem;color:#999;font:14px sans-serif">React を読み込めませんでした。ネットワーク接続を確認して、再読み込みしてください。</p>'; throw new Error("React is not loaded"); }
+<script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef, useCallback, createContext, useContext } = React;
+
+// ===== 保存先設定（元サイトとは完全に分離）=====
+// Firebase: 専用プロジェクト（speak-or-die-9d2f2）に保存します。
+// localStorage: キー接頭辞も別（novelblank:*）なので、同一ドメインでも衝突しません。
 const STORAGE_COLLECTION = "novel";
 const STORAGE_DOC = "main";
+
 const firebaseConfig = {
   apiKey: "AIzaSyAHNl0ZDxpgu2vTXILqXL11ukq22Zgh5Dk",
   authDomain: "speak-or-die-9d2f2.firebaseapp.com",
@@ -1526,6 +1515,7 @@ const firebaseConfig = {
   appId: "1:854343839451:web:465984557f42ddab67e6fe",
   measurementId: "G-40YZFYQH04"
 };
+
 let db = null;
 let auth = null;
 try {
@@ -1533,6 +1523,7 @@ try {
     if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
     }
+    // WebChannel/QUIC 不通時の回避（file:// や一部ネットワーク向け）
     try {
       firebase.firestore().settings({
         experimentalForceLongPolling: true,
@@ -1555,7 +1546,14 @@ try {
 } catch (e) {
   console.warn("Firebase init failed:", e);
 }
-const FS_DOC_URL = "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/(default)/documents/" + STORAGE_COLLECTION + "/" + STORAGE_DOC;
+
+
+// Firestore REST helpers（SDK WebChannel 404 回避）
+const FS_DOC_URL =
+  "https://firestore.googleapis.com/v1/projects/" +
+  firebaseConfig.projectId +
+  "/databases/(default)/documents/" + STORAGE_COLLECTION + "/" + STORAGE_DOC;
+
 function fromFirestoreValue(v) {
   if (v == null) return null;
   if ("stringValue" in v) return v.stringValue;
@@ -1565,29 +1563,31 @@ function fromFirestoreValue(v) {
   if ("nullValue" in v) return null;
   if ("timestampValue" in v) return v.timestampValue;
   if ("arrayValue" in v) {
-    const vals = v.arrayValue && v.arrayValue.values || [];
+    const vals = (v.arrayValue && v.arrayValue.values) || [];
     return vals.map(fromFirestoreValue);
   }
   if ("mapValue" in v) {
-    const fields = v.mapValue && v.mapValue.fields || {};
+    const fields = (v.mapValue && v.mapValue.fields) || {};
     const out = {};
-    Object.keys(fields).forEach(function(k) {
+    Object.keys(fields).forEach(function (k) {
       out[k] = fromFirestoreValue(fields[k]);
     });
     return out;
   }
   return null;
 }
+
 function firestoreDocToObject(doc) {
   if (!doc || !doc.fields) return null;
   const out = {};
-  Object.keys(doc.fields).forEach(function(k) {
+  Object.keys(doc.fields).forEach(function (k) {
     out[k] = fromFirestoreValue(doc.fields[k]);
   });
   return out;
 }
+
 function toFirestoreValue(val) {
-  if (val === null || val === void 0) return { nullValue: null };
+  if (val === null || val === undefined) return { nullValue: null };
   if (typeof val === "string") return { stringValue: val };
   if (typeof val === "boolean") return { booleanValue: val };
   if (typeof val === "number") {
@@ -1599,20 +1599,22 @@ function toFirestoreValue(val) {
   }
   if (typeof val === "object") {
     const fields = {};
-    Object.keys(val).forEach(function(k) {
-      if (val[k] !== void 0) fields[k] = toFirestoreValue(val[k]);
+    Object.keys(val).forEach(function (k) {
+      if (val[k] !== undefined) fields[k] = toFirestoreValue(val[k]);
     });
-    return { mapValue: { fields } };
+    return { mapValue: { fields: fields } };
   }
   return { stringValue: String(val) };
 }
+
 function objectToFirestoreDoc(obj) {
   const fields = {};
-  Object.keys(obj).forEach(function(k) {
-    if (obj[k] !== void 0) fields[k] = toFirestoreValue(obj[k]);
+  Object.keys(obj).forEach(function (k) {
+    if (obj[k] !== undefined) fields[k] = toFirestoreValue(obj[k]);
   });
-  return { fields };
+  return { fields: fields };
 }
+
 async function loadNovelViaRest() {
   const url = FS_DOC_URL + "?key=" + encodeURIComponent(firebaseConfig.apiKey);
   const res = await fetch(url);
@@ -1624,13 +1626,14 @@ async function loadNovelViaRest() {
   const doc = await res.json();
   return firestoreDocToObject(doc);
 }
+
 async function saveNovelViaRest(payload, idToken) {
   const body = objectToFirestoreDoc(payload);
   const headers = { "Content-Type": "application/json" };
   if (idToken) headers["Authorization"] = "Bearer " + idToken;
   const res = await fetch(FS_DOC_URL + "?key=" + encodeURIComponent(firebaseConfig.apiKey), {
     method: "PATCH",
-    headers,
+    headers: headers,
     body: JSON.stringify(body)
   });
   if (!res.ok) {
@@ -1639,6 +1642,7 @@ async function saveNovelViaRest(payload, idToken) {
   }
   return res.json();
 }
+
 const SIZES = [
   { label: "極小", value: "0.75rem" },
   { label: "小", value: "0.85rem" },
@@ -1646,7 +1650,9 @@ const SIZES = [
   { label: "大", value: "1.15rem" },
   { label: "特大", value: "1.35rem" }
 ];
+
 const NovelContext = createContext(null);
+
 function useHashRoute() {
   const [route, setRoute] = useState(() => window.location.hash.slice(1) || "/");
   useEffect(() => {
@@ -1658,21 +1664,24 @@ function useHashRoute() {
   }, []);
   return route;
 }
-const Icon = ({ w, h, d, props }) => React.createElement(
-  "svg",
-  {
-    width: w,
-    height: h,
-    viewBox: "0 0 24 24",
-    fill: "none",
-    stroke: "currentColor",
-    strokeWidth: 2,
-    strokeLinecap: "round",
-    strokeLinejoin: "round",
-    ...props
-  },
-  d.map((p, i) => React.createElement("path", { key: i, d: p }))
-);
+
+const Icon = ({ w, h, d, props }) =>
+  React.createElement(
+    "svg",
+    {
+      width: w,
+      height: h,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      ...props
+    },
+    d.map((p, i) => React.createElement("path", { key: i, d: p }))
+  );
+
 const TITLE_RED = "#c0141c";
 function redRange(text) {
   const s = text || "";
@@ -1685,6 +1694,7 @@ function renderTitleRed(text) {
   if (!r) return s;
   return [s.slice(0, r[0]), React.createElement("span", { key: "red", style: { color: TITLE_RED } }, s.slice(r[0], r[1])), s.slice(r[1])];
 }
+
 function TitleAssemble({ text, charDelay = 70 }) {
   const { user, setEditing, setShowLogin } = useContext(NovelContext);
   const tapRef = useRef({ n: 0, t: 0 });
@@ -1701,6 +1711,7 @@ function TitleAssemble({ text, charDelay = 70 }) {
   };
   const [settled, setSettled] = useState(false);
   const chars = useMemo(() => Array.from(text || ""), [text]);
+  // タイトルの改行位置（必要なら調整）
   const breakAfter = useMemo(() => {
     const t = text || "";
     return -1;
@@ -1725,7 +1736,9 @@ function TitleAssemble({ text, charDelay = 70 }) {
     }
     const h = (i * 9301 + 233) % 233280;
     const n = h / 233280;
-    const dx = (n - 0.5) * 40, dy = (n * 7 % 1 - 0.5) * 28, dr = (n * 13 % 1 - 0.5) * 8;
+    const dx = (n - 0.5) * 40,
+      dy = ((n * 7) % 1 - 0.5) * 28,
+      dr = ((n * 13) % 1 - 0.5) * 8;
     nodes.push(
       React.createElement(
         "span",
@@ -1736,7 +1749,7 @@ function TitleAssemble({ text, charDelay = 70 }) {
             "--dx": dx + "px",
             "--dy": dy + "px",
             "--dr": dr + "deg",
-            ...redIdx && i >= redIdx[0] && i < redIdx[1] ? { color: TITLE_RED } : {},
+            ...(redIdx && i >= redIdx[0] && i < redIdx[1] ? { color: TITLE_RED } : {}),
             transitionDelay: i * charDelay + "ms"
           },
           "aria-hidden": "true"
@@ -1764,6 +1777,7 @@ function TitleAssemble({ text, charDelay = 70 }) {
     nodes
   );
 }
+
 function ReadingControls({ fontIndex, setFontIndex, dark, setDark }) {
   return React.createElement(
     "div",
@@ -1840,28 +1854,31 @@ function ReadingControls({ fontIndex, setFontIndex, dark, setDark }) {
         },
         title: dark ? "明るい画面へ" : "暗い画面へ"
       },
-      dark ? React.createElement(Icon, {
-        w: 14,
-        h: 14,
-        d: ["M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"]
-      }) : React.createElement(Icon, {
-        w: 14,
-        h: 14,
-        d: [
-          "M12 2v2",
-          "M12 20v2",
-          "M4.93 4.93l1.41 1.41",
-          "M17.66 17.66l1.41 1.41",
-          "M2 12h2",
-          "M20 12h2",
-          "M6.34 17.66l-1.41 1.41",
-          "M19.07 4.93l-1.41 1.41",
-          "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8"
-        ]
-      })
+      dark
+        ? React.createElement(Icon, {
+            w: 14,
+            h: 14,
+            d: ["M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"]
+          })
+        : React.createElement(Icon, {
+            w: 14,
+            h: 14,
+            d: [
+              "M12 2v2",
+              "M12 20v2",
+              "M4.93 4.93l1.41 1.41",
+              "M17.66 17.66l1.41 1.41",
+              "M2 12h2",
+              "M20 12h2",
+              "M6.34 17.66l-1.41 1.41",
+              "M19.07 4.93l-1.41 1.41",
+              "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8"
+            ]
+          })
     )
   );
 }
+
 function PageTransition({ routeKey, children }) {
   const [shown, setShown] = useState({ key: routeKey, node: children });
   const [phase, setPhase] = useState("in");
@@ -1879,20 +1896,18 @@ function PageTransition({ routeKey, children }) {
         raf2 = requestAnimationFrame(() => setPhase("in"));
       });
     }, 240);
-    return () => {
-      clearTimeout(t);
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
+    return () => { clearTimeout(t); cancelAnimationFrame(raf1); cancelAnimationFrame(raf2); };
   }, [routeKey, children]);
   const node = shown.key === routeKey ? children : shown.node;
   return React.createElement("div", { className: "page-trans is-" + phase }, node);
 }
+
 function LoginModal({ onClose, onSuccess }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
   const submit = async (e) => {
     e.preventDefault();
     setError("");
@@ -1910,11 +1925,12 @@ function LoginModal({ onClose, onSuccess }) {
         "auth/invalid-credential": "メールまたはパスワードが正しくありません",
         "auth/too-many-requests": "試行回数が多すぎます。しばらく待ってください"
       };
-      setError(messages[code] || err && err.message || "ログインに失敗しました");
+      setError(messages[code] || (err && err.message) || "ログインに失敗しました");
     } finally {
       setLoading(false);
     }
   };
+
   return React.createElement(
     "div",
     {
@@ -2042,18 +2058,20 @@ function LoginModal({ onClose, onSuccess }) {
             outline: "none"
           }
         }),
-        error ? React.createElement(
-          "p",
-          {
-            style: {
-              fontSize: "0.8rem",
-              color: "var(--wine)",
-              marginBottom: "0.75rem",
-              lineHeight: 1.5
-            }
-          },
-          error
-        ) : null,
+        error
+          ? React.createElement(
+              "p",
+              {
+                style: {
+                  fontSize: "0.8rem",
+                  color: "var(--wine)",
+                  marginBottom: "0.75rem",
+                  lineHeight: 1.5
+                }
+              },
+              error
+            )
+          : null,
         React.createElement(
           "button",
           {
@@ -2107,6 +2125,7 @@ function LoginModal({ onClose, onSuccess }) {
     )
   );
 }
+
 function EditToolbar() {
   const {
     editing,
@@ -2119,6 +2138,7 @@ function EditToolbar() {
     setShowLogin,
     logout
   } = useContext(NovelContext);
+
   const onEditClick = () => {
     if (user) {
       setEditing(true);
@@ -2126,10 +2146,12 @@ function EditToolbar() {
       setShowLogin(true);
     }
   };
+
   const onLogoutClick = async () => {
     await logout();
     setEditing(false);
   };
+
   const btnBase = {
     fontFamily: "var(--font-heading)",
     letterSpacing: "0.12em",
@@ -2140,6 +2162,7 @@ function EditToolbar() {
     border: "1px solid hsl(0 0% 10% / 0.25)",
     boxShadow: "0 1px 6px rgba(0,0,0,0.12)"
   };
+
   return React.createElement(
     "div",
     {
@@ -2154,66 +2177,73 @@ function EditToolbar() {
         justifyContent: "flex-end"
       }
     },
-    dirty && editing && React.createElement(
-      "span",
-      {
-        style: {
-          fontSize: "0.55rem",
-          letterSpacing: "0.08em",
-          color: "var(--wine)",
-          background: "var(--offwhite)",
-          padding: "2px 6px",
-          borderRadius: "2px",
-          border: "1px solid var(--wine)",
-          opacity: 0.9
-        }
-      },
-      "未保存"
-    ),
-    // 編集画面: SAVE + LOGOUT のみ
-    editing ? React.createElement(
-      React.Fragment,
-      null,
+    dirty &&
+      editing &&
       React.createElement(
-        "button",
+        "span",
         {
-          onClick: saveToFirebase,
-          disabled: saving,
           style: {
-            ...btnBase,
-            background: "var(--wine)",
-            color: "var(--offwhite)",
-            border: "1px solid var(--wine)",
-            opacity: saving ? 0.6 : 1,
-            cursor: saving ? "wait" : "pointer"
-          }
-        },
-        saving ? "保存中…" : "SAVE"
-      ),
-      React.createElement(
-        "button",
-        {
-          onClick: onLogoutClick,
-          style: {
-            ...btnBase,
+            fontSize: "0.55rem",
+            letterSpacing: "0.08em",
+            color: "var(--wine)",
             background: "var(--offwhite)",
-            color: "var(--charcoal)"
+            padding: "2px 6px",
+            borderRadius: "2px",
+            border: "1px solid var(--wine)",
+            opacity: 0.9
           }
         },
-        "LOGOUT"
-      )
-    ) : null,
-    showLogin && React.createElement(LoginModal, {
-      onClose: () => setShowLogin(false),
-      onSuccess: () => {
-        setShowLogin(false);
-        setEditing(true);
-      }
-    })
+        "未保存"
+      ),
+    // 編集画面: SAVE + LOGOUT のみ
+    editing
+      ? React.createElement(
+          React.Fragment,
+          null,
+          React.createElement(
+            "button",
+            {
+              onClick: saveToFirebase,
+              disabled: saving,
+              style: {
+                ...btnBase,
+                background: "var(--wine)",
+                color: "var(--offwhite)",
+                border: "1px solid var(--wine)",
+                opacity: saving ? 0.6 : 1,
+                cursor: saving ? "wait" : "pointer"
+              }
+            },
+            saving ? "保存中…" : "SAVE"
+          ),
+          React.createElement(
+            "button",
+            {
+              onClick: onLogoutClick,
+              style: {
+                ...btnBase,
+                background: "var(--offwhite)",
+                color: "var(--charcoal)"
+              }
+            },
+            "LOGOUT"
+          )
+        )
+      : null,
+    showLogin &&
+      React.createElement(LoginModal, {
+        onClose: () => setShowLogin(false),
+        onSuccess: () => {
+          setShowLogin(false);
+          setEditing(true);
+        }
+      })
   );
 }
+
 function EditableText({ value, onChange, multiline, lines, style, className, as }) {
   const { editing } = useContext(NovelContext);
+  // lines: 改行を含められる短いテキスト（タイトル等）。改行はそのまま表示される
   if (lines) {
     if (!editing) {
       return React.createElement("span", { className, style: { whiteSpace: "pre-line", ...style } }, value);
@@ -2247,9 +2277,11 @@ function EditableText({ value, onChange, multiline, lines, style, className, as 
       return React.createElement(
         "div",
         { className, style },
-        typeof value === "string" ? value.split("\n").map(
-          (line, i) => React.createElement("p", { key: i, style: { marginBottom: i < value.split("\n").length - 1 ? "1.4em" : 0 } }, line)
-        ) : value
+        typeof value === "string"
+          ? value.split("\n").map((line, i) =>
+              React.createElement("p", { key: i, style: { marginBottom: i < value.split("\n").length - 1 ? "1.4em" : 0 } }, line)
+            )
+          : value
       );
     }
     return React.createElement("span", { className, style }, value);
@@ -2286,8 +2318,9 @@ function EditableText({ value, onChange, multiline, lines, style, className, as 
     className
   });
 }
-function WorkHome() {
-  const { meta, updateMeta, chapters, editing, base } = useContext(NovelContext);
+
+function Home() {
+  const { meta, updateMeta, chapters, editing } = useContext(NovelContext);
   const [entered, setEntered] = useState(false);
   useEffect(() => {
     const t = setTimeout(() => setEntered(true), 400);
@@ -2372,24 +2405,26 @@ function WorkHome() {
               fontSize: "clamp(2.4rem, 8vw, 5.5rem)"
             }
           },
-          editing ? React.createElement(EditableText, {
-            lines: true,
-            value: meta.title,
-            onChange: (v) => updateMeta({ title: v }),
-            style: {
-              background: "transparent",
-              border: "none",
-              textAlign: "center",
-              color: "inherit",
-              fontWeight: 300,
-              letterSpacing: "0.12em",
-              fontSize: "inherit",
-              width: "100%"
-            }
-          }) : React.createElement(TitleAssemble, {
-            text: meta.title || "",
-            charDelay: 70
-          })
+          editing
+            ? React.createElement(EditableText, {
+                lines: true,
+                value: meta.title,
+                onChange: (v) => updateMeta({ title: v }),
+                style: {
+                  background: "transparent",
+                  border: "none",
+                  textAlign: "center",
+                  color: "inherit",
+                  fontWeight: 300,
+                  letterSpacing: "0.12em",
+                  fontSize: "inherit",
+                  width: "100%"
+                }
+              })
+            : React.createElement(TitleAssemble, {
+                text: meta.title || "",
+                charDelay: 70
+              })
         ),
         React.createElement("div", {
           style: {
@@ -2447,7 +2482,7 @@ function WorkHome() {
           React.createElement(
             "a",
             {
-              href: base + "/contents",
+              href: "#/contents",
               style: {
                 position: "relative",
                 fontFamily: "var(--font-heading)",
@@ -2485,7 +2520,9 @@ function WorkHome() {
               transition: "opacity 1000ms"
             }
           },
-          "全" + (total === 34 ? "三十四" : String(total)) + "話 ／ The Complete Text"
+          "全" +
+            (total === 34 ? "三十四" : String(total)) +
+            "話 ／ The Complete Text"
         )
       )
     ),
@@ -2558,7 +2595,6 @@ function WorkHome() {
           "blockquote",
           {
             style: {
-              display: meta.quote || editing ? "block" : "none",
               marginTop: "0",
               paddingLeft: "1.5rem",
               borderLeft: "1px solid hsl(355 90% 18% / 0.4)",
@@ -2578,7 +2614,7 @@ function WorkHome() {
                 opacity: 0.8
               }
             },
-            meta.quote || ""
+            "君が死んだら、僕も死ぬよ。"
           ),
           React.createElement(
             "p",
@@ -2644,8 +2680,8 @@ function WorkHome() {
           React.createElement(
             "ul",
             { style: { listStyle: "none", padding: 0, margin: 0 } },
-            (editing ? meta.characters || [] : (meta.characters || []).filter((c) => c.name || c.desc || c.role)).map(
-              (ch, i) => React.createElement(
+            (meta.characters || []).map((ch, i) =>
+              React.createElement(
                 "li",
                 {
                   key: i,
@@ -2668,8 +2704,8 @@ function WorkHome() {
                   React.createElement(EditableText, {
                     value: ch.name,
                     onChange: (v) => {
-                      const next = (meta.characters || []).map(
-                        (c, j) => j === i ? { ...c, name: v } : c
+                      const next = (meta.characters || []).map((c, j) =>
+                        j === i ? { ...c, name: v } : c
                       );
                       updateMeta({ characters: next });
                     },
@@ -2686,8 +2722,8 @@ function WorkHome() {
                   React.createElement(EditableText, {
                     value: ch.role,
                     onChange: (v) => {
-                      const next = (meta.characters || []).map(
-                        (c, j) => j === i ? { ...c, role: v } : c
+                      const next = (meta.characters || []).map((c, j) =>
+                        j === i ? { ...c, role: v } : c
                       );
                       updateMeta({ characters: next });
                     },
@@ -2704,8 +2740,8 @@ function WorkHome() {
                 React.createElement(EditableText, {
                   value: ch.desc,
                   onChange: (v) => {
-                    const next = (meta.characters || []).map(
-                      (c, j) => j === i ? { ...c, desc: v } : c
+                    const next = (meta.characters || []).map((c, j) =>
+                      j === i ? { ...c, desc: v } : c
                     );
                     updateMeta({ characters: next });
                   },
@@ -2767,8 +2803,8 @@ function WorkHome() {
                 marginLeft: "0.35rem"
               }
             },
-            (editing ? meta.timeline || [] : (meta.timeline || []).filter((t) => t.when || t.event)).map(
-              (t, i) => React.createElement(
+            (meta.timeline || []).map((t, i) =>
+              React.createElement(
                 "li",
                 {
                   key: i,
@@ -2792,8 +2828,8 @@ function WorkHome() {
                 React.createElement(EditableText, {
                   value: t.when,
                   onChange: (v) => {
-                    const next = (meta.timeline || []).map(
-                      (x, j) => j === i ? { ...x, when: v } : x
+                    const next = (meta.timeline || []).map((x, j) =>
+                      j === i ? { ...x, when: v } : x
                     );
                     updateMeta({ timeline: next });
                   },
@@ -2812,8 +2848,8 @@ function WorkHome() {
                 React.createElement(EditableText, {
                   value: t.event,
                   onChange: (v) => {
-                    const next = (meta.timeline || []).map(
-                      (x, j) => j === i ? { ...x, event: v } : x
+                    const next = (meta.timeline || []).map((x, j) =>
+                      j === i ? { ...x, event: v } : x
                     );
                     updateMeta({ timeline: next });
                   },
@@ -2859,7 +2895,7 @@ function WorkHome() {
           React.createElement(
             "a",
             {
-              href: base + "/contents",
+              href: "#/contents",
               style: {
                 display: "inline-flex",
                 alignItems: "center",
@@ -2886,8 +2922,9 @@ function WorkHome() {
     )
   );
 }
+
 function Contents() {
-  const { meta, chapters, base } = useContext(NovelContext);
+  const { meta, chapters } = useContext(NovelContext);
   return React.createElement(
     "main",
     { style: { minHeight: "100vh", background: "var(--offwhite)", color: "var(--charcoal)" } },
@@ -2897,7 +2934,7 @@ function Contents() {
       React.createElement(
         "a",
         {
-          href: base,
+          href: "#/",
           style: {
             display: "inline-flex",
             alignItems: "center",
@@ -2971,7 +3008,7 @@ function Contents() {
               React.createElement(
                 "a",
                 {
-                  href: base + "/read/" + ch.num,
+                  href: "#/read/" + ch.num,
                   className: "toc-row",
                   style: {
                     display: "flex",
@@ -3028,7 +3065,7 @@ function Contents() {
         React.createElement(
           "a",
           {
-            href: base,
+            href: "#/",
             style: {
               display: "inline-flex",
               alignItems: "center",
@@ -3050,8 +3087,9 @@ function Contents() {
     )
   );
 }
+
 function Read({ route }) {
-  const { meta, chapters, updateChapterTitle, updateChapterBody, editing, base } = useContext(NovelContext);
+  const { meta, chapters, updateChapterTitle, updateChapterBody, editing } = useContext(NovelContext);
   const match = route.match(/^\/read\/(\d+)$/);
   const num = match ? match[1] : null;
   const chapter = useMemo(
@@ -3091,6 +3129,7 @@ function Read({ route }) {
     onScroll();
     return () => window.removeEventListener("scroll", onScroll);
   }, [num]);
+
   if (!chapter) {
     return React.createElement(
       "main",
@@ -3119,7 +3158,7 @@ function Read({ route }) {
         React.createElement(
           "a",
           {
-            href: base + "/contents",
+            href: "#/contents",
             style: {
               fontFamily: "var(--font-body)",
               fontSize: "0.875rem",
@@ -3132,12 +3171,14 @@ function Read({ route }) {
       )
     );
   }
+
   const fontSize = SIZES[fontIndex].value;
   const totalChapters = chapters.length;
   const prev = chapter.num > 1 ? chapter.num - 1 : null;
   const next = chapter.num < totalChapters ? chapter.num + 1 : null;
   const numStr = String(chapter.num).padStart(2, "0");
   const nextChapter = next ? chapters.find((c) => c.num === next) : null;
+
   return React.createElement(
     "main",
     {
@@ -3177,7 +3218,7 @@ function Read({ route }) {
         React.createElement(
           "a",
           {
-            href: base + "/contents",
+            href: "#/contents",
             style: {
               display: "flex",
               alignItems: "center",
@@ -3294,53 +3335,55 @@ function Read({ route }) {
           className: "novel-text",
           style: { fontSize, color: "hsl(var(--foreground) / 0.88)" }
         },
-        editing ? React.createElement("textarea", {
-          value: (chapter.paragraphs || []).join("\n\n"),
-          onChange: (e) => updateChapterBody(chapter.num, e.target.value),
-          style: {
-            display: "block",
-            width: "100%",
-            font: "inherit",
-            fontFamily: "var(--font-body)",
-            fontSize: "inherit",
-            lineHeight: 1.95,
-            letterSpacing: "0.04em",
-            color: "inherit",
-            background: "hsl(var(--accent) / 0.06)",
-            border: "1px dashed hsl(var(--accent) / 0.35)",
-            borderRadius: "2px",
-            padding: "0",
-            margin: "0",
-            minHeight: "70vh",
-            resize: "vertical",
-            boxSizing: "border-box",
-            outline: "none",
-            whiteSpace: "pre-wrap",
-            textAlign: "start",
-            overflowWrap: "break-word",
-            wordBreak: "normal"
-          },
-          rows: Math.max(20, (chapter.paragraphs || []).length * 3)
-        }) : (chapter.paragraphs || []).map((p, i) => {
-          if (typeof p === "string" && p.trim() === "") {
-            return React.createElement("div", {
-              key: i,
-              className: "scene-break",
-              role: "separator",
-              "aria-hidden": "true"
-            });
-          }
-          const isDialogue = typeof p === "string" && p.trimStart().startsWith("「");
-          return React.createElement(
-            "p",
-            {
-              key: i,
-              style: isDialogue ? { textIndent: 0 } : void 0,
-              className: isDialogue ? "dialogue" : void 0
-            },
-            p
-          );
-        })
+        editing
+          ? React.createElement("textarea", {
+              value: (chapter.paragraphs || []).join("\n\n"),
+              onChange: (e) => updateChapterBody(chapter.num, e.target.value),
+              style: {
+                display: "block",
+                width: "100%",
+                font: "inherit",
+                fontFamily: "var(--font-body)",
+                fontSize: "inherit",
+                lineHeight: 1.95,
+                letterSpacing: "0.04em",
+                color: "inherit",
+                background: "hsl(var(--accent) / 0.06)",
+                border: "1px dashed hsl(var(--accent) / 0.35)",
+                borderRadius: "2px",
+                padding: "0",
+                margin: "0",
+                minHeight: "70vh",
+                resize: "vertical",
+                boxSizing: "border-box",
+                outline: "none",
+                whiteSpace: "pre-wrap",
+                textAlign: "start",
+                overflowWrap: "break-word",
+                wordBreak: "normal"
+              },
+              rows: Math.max(20, (chapter.paragraphs || []).length * 3)
+            })
+          : (chapter.paragraphs || []).map((p, i) => {
+              if (typeof p === "string" && p.trim() === "") {
+                return React.createElement("div", {
+                  key: i,
+                  className: "scene-break",
+                  role: "separator",
+                  "aria-hidden": "true"
+                });
+              }
+              const isDialogue = typeof p === "string" && p.trimStart().startsWith("「");
+              return React.createElement(
+                "p",
+                {
+                  key: i,
+                  style: isDialogue ? { textIndent: 0 } : undefined,
+                  className: isDialogue ? "dialogue" : undefined
+                },
+                p
+              );
+            })
       ),
       React.createElement(
         "div",
@@ -3382,26 +3425,28 @@ function Read({ route }) {
               gap: "1rem"
             }
           },
-          prev ? React.createElement(
-            "a",
-            {
-              href: base + "/read/" + prev,
-              style: {
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
-                fontFamily: "var(--font-body)",
-                fontSize: "0.875rem",
-                color: "hsl(var(--muted-foreground))"
-              }
-            },
-            React.createElement(Icon, { w: 16, h: 16, d: ["m15 18-6-6 6-6"] }),
-            React.createElement("span", { className: "sm-inline" }, "前話")
-          ) : React.createElement("span", { style: { width: "3rem" } }),
+          prev
+            ? React.createElement(
+                "a",
+                {
+                  href: "#/read/" + prev,
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    fontFamily: "var(--font-body)",
+                    fontSize: "0.875rem",
+                    color: "hsl(var(--muted-foreground))"
+                  }
+                },
+                React.createElement(Icon, { w: 16, h: 16, d: ["m15 18-6-6 6-6"] }),
+                React.createElement("span", { className: "sm-inline" }, "前話")
+              )
+            : React.createElement("span", { style: { width: "3rem" } }),
           React.createElement(
             "a",
             {
-              href: base + "/contents",
+              href: "#/contents",
               style: {
                 fontFamily: "var(--font-body)",
                 fontSize: "0.75rem",
@@ -3411,677 +3456,370 @@ function Read({ route }) {
             },
             "目次"
           ),
-          next ? React.createElement(
-            "a",
+          next
+            ? React.createElement(
+                "a",
+                {
+                  href: "#/read/" + next,
+                  style: {
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    fontFamily: "var(--font-body)",
+                    fontSize: "0.875rem",
+                    color: "hsl(var(--muted-foreground))"
+                  }
+                },
+                React.createElement("span", { className: "sm-inline" }, "次話"),
+                React.createElement(Icon, { w: 16, h: 16, d: ["m9 18 6-6-6-6"] })
+              )
+            : React.createElement("span", { style: { width: "3rem" } })
+        ),
+        next &&
+          nextChapter &&
+          React.createElement(
+            "p",
             {
-              href: base + "/read/" + next,
               style: {
-                display: "flex",
-                alignItems: "center",
-                gap: "0.5rem",
+                marginTop: "1.5rem",
+                textAlign: "center",
                 fontFamily: "var(--font-body)",
-                fontSize: "0.875rem",
-                color: "hsl(var(--muted-foreground))"
+                fontSize: "0.75rem",
+                color: "hsl(var(--muted-foreground) / 0.7)",
+                letterSpacing: "0.05em"
               }
             },
-            React.createElement("span", { className: "sm-inline" }, "次話"),
-            React.createElement(Icon, { w: 16, h: 16, d: ["m9 18 6-6-6-6"] })
-          ) : React.createElement("span", { style: { width: "3rem" } })
-        ),
-        next && nextChapter && React.createElement(
-          "p",
-          {
-            style: {
-              marginTop: "1.5rem",
-              textAlign: "center",
-              fontFamily: "var(--font-body)",
-              fontSize: "0.75rem",
-              color: "hsl(var(--muted-foreground) / 0.7)",
-              letterSpacing: "0.05em"
-            }
-          },
-          nextChapter.title
-        ),
-        !next && React.createElement(
-          "p",
-          {
-            style: {
-              marginTop: "1.5rem",
-              textAlign: "center",
-              fontFamily: "var(--font-heading)",
-              fontSize: "0.875rem",
-              letterSpacing: "0.2em",
-              color: "hsl(var(--muted-foreground) / 0.7)"
-            }
-          },
-          "── 完 ──"
-        )
+            nextChapter.title
+          ),
+        !next &&
+          React.createElement(
+            "p",
+            {
+              style: {
+                marginTop: "1.5rem",
+                textAlign: "center",
+                fontFamily: "var(--font-heading)",
+                fontSize: "0.875rem",
+                letterSpacing: "0.2em",
+                color: "hsl(var(--muted-foreground) / 0.7)"
+              }
+            },
+            "── 完 ──"
+          )
       )
     )
   );
 }
-const DEFAULT_RADAR_DATA = { "title": "特徴レーダー", "desc": "いくつかのテーマ軸から、各作品の特徴を多角形で表します。", "axes": [{ "id": "a1", "label": "心理描写" }, { "id": "a2", "label": "思弁性" }, { "id": "a3", "label": "物語性" }, { "id": "a4", "label": "幻想性" }, { "id": "a5", "label": "余韻" }], "values": { "speak-or-die": { "a1": 90, "a2": 80, "a3": 55, "a4": 40, "a5": 85 } } };
-const DEFAULT_QUIZ_DATA = { "title": "フローチャート診断", "desc": "十の問いへの答えから、あなたの読書傾向と、いま響きやすい作品を推します。", "startLabel": "診断をはじめる", "recommendCount": 3, "questions": [{ "id": "q1", "text": "物語を開くとき、最初に探してしまうのは？", "choices": [{ "id": "q1a", "label": "人物の心の揺れ", "scores": { "a1": 22, "a5": 8 } }, { "id": "q1b", "label": "世界の仕組みや仮説", "scores": { "a2": 22, "a4": 6 } }, { "id": "q1c", "label": "出来事の連鎖と展開", "scores": { "a3": 22, "a1": 4 } }, { "id": "q1d", "label": "現実から少し外れた気配", "scores": { "a4": 22, "a5": 6 } }] }, { "id": "q2", "text": "読み終わったあと、長く残るのはどれに近いですか？", "choices": [{ "id": "q2a", "label": "言い切れない余白", "scores": { "a5": 24, "a1": 6 } }, { "id": "q2b", "label": "考え続けたくなる問い", "scores": { "a2": 24, "a5": 4 } }, { "id": "q2c", "label": "ドラマの高まり", "scores": { "a3": 22, "a1": 6 } }, { "id": "q2d", "label": "夢のような映像感", "scores": { "a4": 22, "a5": 8 } }] }, { "id": "q3", "text": "好みの語り口は？", "choices": [{ "id": "q3a", "label": "内面に沈む静かな語り", "scores": { "a1": 20, "a5": 10 } }, { "id": "q3b", "label": "概念を丁寧に組み立てる語り", "scores": { "a2": 22, "a3": 4 } }, { "id": "q3c", "label": "場面が次々と動く語り", "scores": { "a3": 22, "a4": 4 } }, { "id": "q3d", "label": "比喩と幻影が濃い語り", "scores": { "a4": 20, "a1": 6 } }] }, { "id": "q4", "text": "「良い一冊」の条件に近いのは？", "choices": [{ "id": "q4a", "label": "人の弱さや迷いが丁寧に書かれている", "scores": { "a1": 24, "a5": 6 } }, { "id": "q4b", "label": "世界の見方がひとつ増える", "scores": { "a2": 24, "a5": 4 } }, { "id": "q4c", "label": "最後まで手放せない展開がある", "scores": { "a3": 24, "a1": 4 } }, { "id": "q4d", "label": "現実では触れられない空気がある", "scores": { "a4": 24, "a5": 6 } }] }, { "id": "q5", "text": "気分が沈んでいるとき、手に取りたいのは？", "choices": [{ "id": "q5a", "label": "同じ温度で寄り添う物語", "scores": { "a1": 18, "a5": 14 } }, { "id": "q5b", "label": "思考を別の軌道に乗せる話", "scores": { "a2": 20, "a4": 8 } }, { "id": "q5c", "label": "明確な物語の推進力", "scores": { "a3": 20, "a1": 6 } }, { "id": "q5d", "label": "現実から少し離れる幻想", "scores": { "a4": 18, "a5": 12 } }] }, { "id": "q6", "text": "登場人物について、いちばん大事なのは？", "choices": [{ "id": "q6a", "label": "感情の機微が伝わること", "scores": { "a1": 26, "a5": 4 } }, { "id": "q6b", "label": "思想や立場がはっきりしていること", "scores": { "a2": 22, "a3": 6 } }, { "id": "q6c", "label": "行動と選択が物語を動かすこと", "scores": { "a3": 24, "a1": 6 } }, { "id": "q6d", "label": "存在そのものが象徴的であること", "scores": { "a4": 20, "a5": 8 } }] }, { "id": "q7", "text": "結末の好みは？", "choices": [{ "id": "q7a", "label": "答えより余韻が残る終わり", "scores": { "a5": 26, "a1": 6 } }, { "id": "q7b", "label": "仮説が回収される知的な締め", "scores": { "a2": 24, "a3": 6 } }, { "id": "q7c", "label": "決着のついた物語的な終わり", "scores": { "a3": 24, "a5": 4 } }, { "id": "q7d", "label": "現実に戻ったあとも幻が残る終わり", "scores": { "a4": 18, "a5": 14 } }] }, { "id": "q8", "text": "読書中にうれしい瞬間は？", "choices": [{ "id": "q8a", "label": "「この人の気持ち、わかる」と感じたとき", "scores": { "a1": 24, "a5": 6 } }, { "id": "q8b", "label": "「そういう見方があるのか」と驚いたとき", "scores": { "a2": 26, "a4": 4 } }, { "id": "q8c", "label": "次の展開が気になって止まらないとき", "scores": { "a3": 26, "a1": 4 } }, { "id": "q8d", "label": "景色や気配が目の裏に残るとき", "scores": { "a4": 22, "a5": 10 } }] }, { "id": "q9", "text": "短編と長編、いまの気分は？", "choices": [{ "id": "q9a", "label": "短い密度で心に触れるもの", "scores": { "a1": 14, "a5": 18 } }, { "id": "q9b", "label": "長く考えを積み上げるもの", "scores": { "a2": 18, "a3": 12 } }, { "id": "q9c", "label": "長い旅のような物語", "scores": { "a3": 22, "a4": 6 } }, { "id": "q9d", "label": "長さより「別世界」感", "scores": { "a4": 20, "a5": 10 } }] }, { "id": "q10", "text": "最後にひとつ。あなたが物語に求めるものは？", "choices": [{ "id": "q10a", "label": "理解される感覚", "scores": { "a1": 22, "a5": 12 } }, { "id": "q10b", "label": "新しい認識の枠組み", "scores": { "a2": 24, "a5": 6 } }, { "id": "q10c", "label": "忘れられない物語体験", "scores": { "a3": 22, "a5": 8 } }, { "id": "q10d", "label": "日常の外側への通路", "scores": { "a4": 22, "a5": 10 } }] }] };
-const LIB_DOC = "library";
-const EMBEDDED_ID = "speak-or-die";
-const clone = (o) => JSON.parse(JSON.stringify(o));
-const RADAR_PALETTE = ["#c8a86a", "#8b5cf6", "#f59e0b", "#38bdf8", "#f87171", "#4ade80", "#f472b6"];
-function docUrl(docId) {
-  return "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/(default)/documents/" + STORAGE_COLLECTION + "/" + docId;
-}
-async function cloudLoad(docId) {
-  try {
-    const res = await fetch(docUrl(docId) + "?key=" + encodeURIComponent(firebaseConfig.apiKey));
-    if (res.status === 404) return null;
-    if (!res.ok) throw new Error("REST read " + res.status);
-    return firestoreDocToObject(await res.json());
-  } catch (restErr) {
-    if (!db) throw restErr;
-    const snap = await Promise.race([
-      db.collection(STORAGE_COLLECTION).doc(docId).get(),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("Firestore timeout")), 8e3))
-    ]);
-    return snap && snap.exists ? snap.data() : null;
-  }
-}
-async function cloudSave(docId, payload, idToken) {
-  try {
-    const headers = { "Content-Type": "application/json" };
-    if (idToken) headers["Authorization"] = "Bearer " + idToken;
-    const res = await fetch(docUrl(docId) + "?key=" + encodeURIComponent(firebaseConfig.apiKey), {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify(objectToFirestoreDoc(payload))
-    });
-    if (!res.ok) throw new Error("REST write " + res.status + ": " + (await res.text()).slice(0, 200));
-  } catch (restErr) {
-    if (!db) throw restErr;
-    await db.collection(STORAGE_COLLECTION).doc(docId).set(payload);
-  }
-}
-async function cloudDelete(docId, idToken) {
-  try {
-    const headers = {};
-    if (idToken) headers["Authorization"] = "Bearer " + idToken;
-    await fetch(docUrl(docId) + "?key=" + encodeURIComponent(firebaseConfig.apiKey), { method: "DELETE", headers });
-  } catch (e) {
-    console.warn("delete failed", e);
-  }
-}
-function defaultLibrary() {
-  return {
-    site: { title: "BOOKSHELF", subtitle: "A PERSONAL NOVEL LIBRARY", epigraph: "" },
-    works: [{
-      id: EMBEDDED_ID,
-      docId: "main",
-      draft: false,
-      title: defaultNovelMeta.title,
-      titleEn: defaultNovelMeta.titleEn,
-      synopsis: defaultNovelMeta.synopsis,
-      chapterCount: defaultChapters.length
-    }],
-    radar: clone(DEFAULT_RADAR_DATA),
-    quiz: clone(DEFAULT_QUIZ_DATA)
-  };
-}
-function emptyWork(title) {
-  return {
-    meta: {
-      title: title || "",
-      titleEn: "",
-      subtitle: "A LITERARY WORK",
-      synopsis: "",
-      note: "",
-      characters: [],
-      timeline: []
-    },
-    chapters: [{ num: 1, title: "第一話", paragraphs: [] }]
-  };
-}
-function normalizeQuizScores(raw, axes) {
-  let maxAbs = 0;
-  axes.forEach((ax) => {
-    const v = Math.abs(raw[ax.id] || 0);
-    if (v > maxAbs) maxAbs = v;
-  });
-  if (maxAbs < 1) maxAbs = 1;
-  const out = {};
-  axes.forEach((ax) => {
-    out[ax.id] = Math.round(Math.max(0, Math.min(100, (raw[ax.id] || 0) / maxAbs * 100)));
-  });
-  return out;
-}
-function quizSimilarity(userPct, vals, axes) {
-  if (!axes.length) return 0;
-  let sum = 0, n = 0;
-  axes.forEach((ax) => {
-    const u = userPct[ax.id];
-    if (u === void 0) return;
-    let w = vals && vals[ax.id];
-    if (w === void 0 || w === null) w = 50;
-    sum += 100 - Math.min(100, Math.abs(u - Number(w)));
-    n++;
-  });
-  return n ? sum / n : 0;
-}
-function quizProfile(userPct, axes) {
-  const rows = axes.map((ax) => ({ label: ax.label || ax.id, u: userPct[ax.id] || 0 })).sort((a, b) => b.u - a.u);
-  if (!rows.length) return "";
-  let top = rows.filter((r) => r.u >= 55);
-  if (!top.length) top = rows.slice(0, Math.min(2, rows.length));
-  const low = rows.filter((r) => r.u < 30);
-  let text = "「" + top.map((r) => r.label + " " + r.u + "%").join("、") + "」が強く、ここを軸に作品を選びやすい傾向です。";
-  if (low.length) text += "「" + low.map((r) => r.label).join("・") + "」は相対的に控えめです。";
-  return text;
-}
-function quizReason(userPct, item, axes) {
-  const title = item.work.title || "この作品";
-  const rows = axes.map((ax) => {
-    const u = userPct[ax.id] || 0;
-    let wv = item.vals[ax.id];
-    if (wv === void 0 || wv === null) wv = 50;
-    wv = Math.round(Number(wv));
-    return { label: ax.label || ax.id, u, w: wv, gap: Math.abs(u - wv) };
-  });
-  const bothHigh = rows.filter((r) => r.u >= 55 && r.w >= 55).sort((a, b) => b.u + b.w - (a.u + a.w));
-  const close = rows.slice().sort((a, b) => a.gap - b.gap);
-  const byUser = rows.slice().sort((a, b) => b.u - a.u);
-  const sim = Math.round(item.sim);
-  const parts = [];
-  if (sim >= 70) parts.push("「" + title + "」は全体の型がよく合います（適合 " + sim + "%）。");
-  else if (sim >= 50) parts.push("「" + title + "」は主軸のいくつかで噛み合います（適合 " + sim + "%）。");
-  else parts.push("「" + title + "」は部分的に接点があります（適合 " + sim + "%）。");
-  if (bothHigh.length) parts.push("共鳴点は" + bothHigh.slice(0, 2).map((r) => "「" + r.label + "」（あなた" + r.u + "%／作品" + r.w + "）").join("、") + "。");
-  else if (close[0] && close[0].gap <= 25) parts.push("いちばん近いのは「" + close[0].label + "」（あなた" + close[0].u + "%／作品" + close[0].w + "）。");
-  if (byUser[0] && byUser[0].u >= 60) {
-    const t = byUser[0];
-    if (t.w >= 55 && t.gap <= 30) parts.push("最重視の「" + t.label + "」を作品側も十分に持っています。");
-    else if (t.gap > 35) parts.push("最重視の「" + t.label + "」は作品側" + t.w + "と差があるため、そこだけを本命にしない方がよいです。");
-  }
-  return parts.join("");
-}
-function quizRecommend(userPct, lib) {
-  const axes = lib.radar.axes || [];
-  const cands = (lib.works || []).filter((w) => !w.draft);
-  const scored = cands.map((w) => {
-    const vals = lib.radar.values && lib.radar.values[w.id] || {};
-    return { work: w, vals, sim: quizSimilarity(userPct, vals, axes) };
-  }).sort((a, b) => b.sim - a.sim);
-  const count = Math.max(1, Math.min(5, Number(lib.quiz.recommendCount) || 3));
-  return scored.slice(0, count).map((it, i) => ({ rank: i + 1, ...it, reason: quizReason(userPct, it, axes) }));
-}
-const ghostBtn = {
-  fontFamily: "var(--font-heading)",
-  letterSpacing: "0.12em",
-  fontSize: "0.7rem",
-  padding: "0.35rem 0.7rem",
-  borderRadius: "2px",
-  cursor: "pointer",
-  border: "1px solid currentColor",
-  background: "transparent",
-  color: "inherit",
-  opacity: 0.8
-};
-const inputStyle = {
-  font: "inherit",
-  fontSize: "0.85rem",
-  color: "inherit",
-  background: "hsl(var(--accent) / 0.06)",
-  border: "1px dashed hsl(var(--accent) / 0.45)",
-  borderRadius: "2px",
-  padding: "0.3rem 0.5rem",
-  width: "100%"
-};
-function BackLink({ href, children, light }) {
-  return /* @__PURE__ */ React.createElement("a", { href, style: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "0.5rem",
-    fontFamily: "var(--font-body)",
-    fontSize: "0.85rem",
-    color: light ? "var(--offwhite)" : "var(--charcoal)",
-    opacity: 0.55
-  } }, /* @__PURE__ */ React.createElement(Icon, { w: 16, h: 16, d: ["m12 19-7-7 7-7", "M19 12H5"] }), " ", children);
-}
-function Library() {
-  const { lib, editing, updateSite, addWork, removeWork, moveWork, toggleDraft } = useContext(NovelContext);
-  const works = (lib.works || []).filter((w) => editing || !w.draft);
-  return /* @__PURE__ */ React.createElement("main", { style: { minHeight: "100vh", background: "var(--charcoal)", color: "var(--offwhite)" } }, /* @__PURE__ */ React.createElement("section", { style: { textAlign: "center", padding: "8rem 1.5rem 4rem" } }, /* @__PURE__ */ React.createElement("p", { className: "font-display", style: { letterSpacing: "0.45em", fontSize: "0.75rem", opacity: 0.55, marginBottom: "2rem" } }, /* @__PURE__ */ React.createElement(EditableText, { lines: true, value: lib.site.subtitle, onChange: (v) => updateSite({ subtitle: v }) })), /* @__PURE__ */ React.createElement("h1", { className: "font-heading home-title", style: { fontWeight: 300, fontSize: "clamp(2.2rem,7vw,3.6rem)", letterSpacing: "0.12em", lineHeight: 1.3 } }, editing ? /* @__PURE__ */ React.createElement(EditableText, { lines: true, value: lib.site.title, onChange: (v) => updateSite({ title: v }) }) : /* @__PURE__ */ React.createElement(TitleAssemble, { text: lib.site.title })), (lib.site.epigraph || editing) && /* @__PURE__ */ React.createElement("p", { className: "font-body", style: { marginTop: "2rem", fontSize: "0.9rem", letterSpacing: "0.12em", lineHeight: 2, opacity: 0.6 } }, /* @__PURE__ */ React.createElement(EditableText, { lines: true, value: lib.site.epigraph, onChange: (v) => updateSite({ epigraph: v }) })), /* @__PURE__ */ React.createElement("div", { style: { height: "1px", width: "3rem", background: "var(--wine)", margin: "3rem auto 0" } })), /* @__PURE__ */ React.createElement("section", { style: { maxWidth: "46rem", margin: "0 auto", padding: "0 1.5rem 3rem" } }, works.map((w, i) => /* @__PURE__ */ React.createElement("div", { key: w.id, style: { borderBottom: "1px solid hsl(0 0% 100% / 0.12)", opacity: w.draft ? 0.5 : 1 } }, /* @__PURE__ */ React.createElement("a", { href: "#/w/" + w.id, className: "toc-row", style: { display: "flex", gap: "1.5rem", padding: "2rem 0 1.25rem", alignItems: "baseline" } }, /* @__PURE__ */ React.createElement("span", { className: "font-display", style: { fontSize: "0.9rem", opacity: 0.4, width: "2rem", flexShrink: 0 } }, String(i + 1).padStart(2, "0")), /* @__PURE__ */ React.createElement("span", { style: { flex: 1, minWidth: 0 } }, /* @__PURE__ */ React.createElement("span", { className: "font-heading", style: { display: "block", fontSize: "1.45rem", fontWeight: 300, letterSpacing: "0.1em", lineHeight: 1.5 } }, renderTitleRed(w.title) || "（無題）", w.draft ? "　［非公開］" : ""), w.titleEn && /* @__PURE__ */ React.createElement("span", { className: "font-display", style: { display: "block", fontStyle: "italic", fontSize: "0.85rem", letterSpacing: "0.2em", opacity: 0.5, marginTop: "0.25rem" } }, w.titleEn), w.synopsis && /* @__PURE__ */ React.createElement("span", { className: "font-body", style: { display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden", marginTop: "0.9rem", fontSize: "0.85rem", lineHeight: 1.9, opacity: 0.65 } }, String(w.synopsis).replace(/\n/g, " ")), /* @__PURE__ */ React.createElement("span", { className: "font-display", style: { display: "block", marginTop: "0.9rem", fontSize: "0.7rem", letterSpacing: "0.3em", opacity: 0.45 } }, "全", w.chapterCount || 0, "話　READ →"))), editing && /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: "0.4rem", padding: "0 0 1.2rem 3.5rem", flexWrap: "wrap" } }, /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => moveWork(w.id, -1) }, "↑"), /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => moveWork(w.id, 1) }, "↓"), /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => toggleDraft(w.id) }, w.draft ? "公開する" : "非公開にする"), /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => removeWork(w.id) }, "削除")))), !works.length && /* @__PURE__ */ React.createElement("p", { style: { textAlign: "center", opacity: 0.5, padding: "3rem 0" } }, "公開中の作品はまだありません。"), editing && /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center", padding: "2rem 0" } }, /* @__PURE__ */ React.createElement("button", { style: { ...ghostBtn, fontSize: "0.8rem", padding: "0.6rem 1.4rem" }, onClick: addWork }, "＋ 作品を追加"))), /* @__PURE__ */ React.createElement("nav", { style: { display: "flex", justifyContent: "center", gap: "2.5rem", flexWrap: "wrap", padding: "1rem 1.5rem 6rem" } }, /* @__PURE__ */ React.createElement("a", { href: "#/radar", className: "font-heading", style: { letterSpacing: "0.25em", fontSize: "0.8rem", opacity: 0.7, borderBottom: "1px solid hsl(0 0% 100% / 0.3)", paddingBottom: "4px" } }, "特徴レーダー"), /* @__PURE__ */ React.createElement("a", { href: "#/quiz", className: "font-heading", style: { letterSpacing: "0.25em", fontSize: "0.8rem", opacity: 0.7, borderBottom: "1px solid hsl(0 0% 100% / 0.3)", paddingBottom: "4px" } }, "フローチャート診断")));
-}
-function RadarChart({ axes, works, values, activeId }) {
-  const W = 520, H = 520, cx = W / 2, cy = H / 2, R = 190;
-  const ang = (i) => -Math.PI / 2 + i * (2 * Math.PI / axes.length);
-  const pt = (i, v) => {
-    const r = Math.max(0, Math.min(100, Number(v) || 0)) / 100 * R;
-    return cx + r * Math.cos(ang(i)) + "," + (cy + r * Math.sin(ang(i)));
-  };
-  return /* @__PURE__ */ React.createElement("svg", { viewBox: "0 0 " + W + " " + H, width: "100%", style: { maxWidth: "520px", display: "block", margin: "0 auto" } }, [0.25, 0.5, 0.75, 1].map((r) => /* @__PURE__ */ React.createElement("polygon", { key: r, fill: "none", stroke: "hsl(0 0% 100% / 0.14)", points: axes.map((_, i) => cx + R * r * Math.cos(ang(i)) + "," + (cy + R * r * Math.sin(ang(i)))).join(" ") })), axes.map((ax, i) => /* @__PURE__ */ React.createElement("g", { key: ax.id }, /* @__PURE__ */ React.createElement("line", { x1: cx, y1: cy, x2: cx + R * Math.cos(ang(i)), y2: cy + R * Math.sin(ang(i)), stroke: "hsl(0 0% 100% / 0.14)" }), /* @__PURE__ */ React.createElement("text", { x: cx + (R + 26) * Math.cos(ang(i)), y: cy + (R + 26) * Math.sin(ang(i)) + 4, textAnchor: "middle", fill: "currentColor", fillOpacity: "0.75", fontSize: "14", style: { letterSpacing: "0.1em" } }, ax.label))), works.map((w, si) => {
-    if (activeId && activeId !== w.id) return null;
-    const vals = (values || {})[w.id] || {};
-    const color = RADAR_PALETTE[si % RADAR_PALETTE.length];
-    return /* @__PURE__ */ React.createElement("polygon", { key: w.id, points: axes.map((ax, i) => pt(i, vals[ax.id])).join(" "), fill: color, fillOpacity: activeId ? 0.25 : 0.12, stroke: color, strokeWidth: activeId ? 2.2 : 1.4 });
-  }));
-}
-function RadarPage() {
-  const { lib, editing, updateRadar } = useContext(NovelContext);
-  const radar = lib.radar;
-  const works = (lib.works || []).filter((w) => editing || !w.draft);
-  const [active, setActive] = useState(null);
-  const setVal = (wid, aid, v) => updateRadar((r) => {
-    r.values[wid] = { ...r.values[wid] || {}, [aid]: Math.max(0, Math.min(100, Number(v) || 0)) };
-  });
-  return /* @__PURE__ */ React.createElement("main", { style: { minHeight: "100vh", background: "var(--charcoal)", color: "var(--offwhite)" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: "46rem", margin: "0 auto", padding: "5rem 1.5rem 7rem" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: "3rem" } }, /* @__PURE__ */ React.createElement(BackLink, { href: "#/", light: true }, "作品一覧")), /* @__PURE__ */ React.createElement("h1", { className: "font-heading", style: { fontWeight: 300, fontSize: "1.75rem", letterSpacing: "0.15em", marginBottom: "1rem" } }, /* @__PURE__ */ React.createElement(EditableText, { lines: true, value: radar.title, onChange: (v) => updateRadar((r) => {
-    r.title = v;
-  }) })), /* @__PURE__ */ React.createElement("p", { style: { opacity: 0.6, fontSize: "0.9rem", lineHeight: 2, marginBottom: "2.5rem" } }, /* @__PURE__ */ React.createElement(EditableText, { lines: true, value: radar.desc, onChange: (v) => updateRadar((r) => {
-    r.desc = v;
-  }) })), /* @__PURE__ */ React.createElement(RadarChart, { axes: radar.axes, works, values: radar.values, activeId: active }), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "0.6rem", justifyContent: "center", margin: "2.5rem 0" } }, /* @__PURE__ */ React.createElement("button", { style: { ...ghostBtn, opacity: active ? 0.5 : 1 }, onClick: () => setActive(null) }, "すべて重ねる"), works.map((w, i) => /* @__PURE__ */ React.createElement(
-    "button",
-    {
-      key: w.id,
-      onClick: () => setActive(active === w.id ? null : w.id),
-      style: { ...ghostBtn, borderColor: RADAR_PALETTE[i % RADAR_PALETTE.length], opacity: active && active !== w.id ? 0.4 : 1 }
-    },
-    /* @__PURE__ */ React.createElement("span", { style: { display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: RADAR_PALETTE[i % RADAR_PALETTE.length], marginRight: 6 } }),
-    w.title || "（無題）"
-  ))), editing && /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid hsl(0 0% 100% / 0.15)", paddingTop: "2rem" } }, /* @__PURE__ */ React.createElement("p", { style: { fontSize: "0.8rem", opacity: 0.6, marginBottom: "1rem" } }, "軸の名前と、作品ごとの数値（0〜100）を編集できます。軸は3つ以上必要です。"), /* @__PURE__ */ React.createElement("div", { style: { overflowX: "auto" } }, /* @__PURE__ */ React.createElement("table", { style: { borderCollapse: "collapse", width: "100%", fontSize: "0.8rem" } }, /* @__PURE__ */ React.createElement("thead", null, /* @__PURE__ */ React.createElement("tr", null, /* @__PURE__ */ React.createElement("th", { style: { textAlign: "left", padding: "0.4rem" } }, "作品"), radar.axes.map((ax) => /* @__PURE__ */ React.createElement("th", { key: ax.id, style: { padding: "0.4rem", minWidth: "5.5rem" } }, /* @__PURE__ */ React.createElement("input", { style: inputStyle, value: ax.label, onChange: (e) => updateRadar((r) => {
-    r.axes.find((a) => a.id === ax.id).label = e.target.value;
-  }) }), radar.axes.length > 3 && /* @__PURE__ */ React.createElement("button", { style: { ...ghostBtn, marginTop: 4, fontSize: "0.6rem" }, onClick: () => updateRadar((r) => {
-    r.axes = r.axes.filter((a) => a.id !== ax.id);
-  }) }, "軸を削除"))), /* @__PURE__ */ React.createElement("th", { style: { padding: "0.4rem" } }, /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => updateRadar((r) => {
-    r.axes.push({ id: "a" + Date.now().toString(36), label: "新しい軸" });
-  }) }, "＋軸")))), /* @__PURE__ */ React.createElement("tbody", null, works.map((w) => /* @__PURE__ */ React.createElement("tr", { key: w.id, style: { borderTop: "1px solid hsl(0 0% 100% / 0.1)" } }, /* @__PURE__ */ React.createElement("td", { style: { padding: "0.4rem" } }, w.title || "（無題）"), radar.axes.map((ax) => {
-    var _a;
-    return /* @__PURE__ */ React.createElement("td", { key: ax.id, style: { padding: "0.4rem" } }, /* @__PURE__ */ React.createElement("input", { type: "number", min: "0", max: "100", style: inputStyle, value: (_a = (radar.values[w.id] || {})[ax.id]) != null ? _a : 50, onChange: (e) => setVal(w.id, ax.id, e.target.value) }));
-  }), /* @__PURE__ */ React.createElement("td", null)))))))));
-}
-function QuizEditor() {
-  const { lib, updateQuiz } = useContext(NovelContext);
-  const quiz = lib.quiz, axes = lib.radar.axes;
-  return /* @__PURE__ */ React.createElement("div", { style: { borderTop: "1px solid hsl(0 0% 100% / 0.15)", paddingTop: "2rem", marginTop: "3rem" } }, /* @__PURE__ */ React.createElement("p", { style: { fontSize: "0.8rem", opacity: 0.6, marginBottom: "1rem" } }, "各選択肢に、特徴レーダーの軸ごとの加点を設定します（空欄は0点）。"), /* @__PURE__ */ React.createElement("label", { style: { fontSize: "0.8rem" } }, "おすすめ表示数（1〜5）　", /* @__PURE__ */ React.createElement("input", { type: "number", min: "1", max: "5", style: { ...inputStyle, width: "4rem" }, value: quiz.recommendCount, onChange: (e) => updateQuiz((q) => {
-    q.recommendCount = Math.max(1, Math.min(5, Number(e.target.value) || 3));
-  }) })), quiz.questions.map((q, qi) => /* @__PURE__ */ React.createElement("div", { key: q.id, style: { border: "1px solid hsl(0 0% 100% / 0.15)", padding: "1rem", marginTop: "1.2rem" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: "0.5rem", alignItems: "center" } }, /* @__PURE__ */ React.createElement("span", { className: "font-display", style: { opacity: 0.5 } }, "Q", qi + 1), /* @__PURE__ */ React.createElement("input", { style: inputStyle, value: q.text, onChange: (e) => updateQuiz((z) => {
-    z.questions[qi].text = e.target.value;
-  }) }), /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => updateQuiz((z) => {
-    z.questions.splice(qi, 1);
-  }) }, "削除")), q.choices.map((c, ci) => /* @__PURE__ */ React.createElement("div", { key: c.id, style: { marginTop: "0.8rem", paddingLeft: "1rem" } }, /* @__PURE__ */ React.createElement("div", { style: { display: "flex", gap: "0.5rem" } }, /* @__PURE__ */ React.createElement("input", { style: inputStyle, value: c.label, onChange: (e) => updateQuiz((z) => {
-    z.questions[qi].choices[ci].label = e.target.value;
-  }) }), /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => updateQuiz((z) => {
-    z.questions[qi].choices.splice(ci, 1);
-  }) }, "×")), /* @__PURE__ */ React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: "0.6rem", marginTop: "0.4rem" } }, axes.map((ax) => {
-    var _a;
-    return /* @__PURE__ */ React.createElement("label", { key: ax.id, style: { fontSize: "0.7rem", opacity: 0.8 } }, ax.label, /* @__PURE__ */ React.createElement(
-      "input",
-      {
-        type: "number",
-        style: { ...inputStyle, width: "3.5rem" },
-        value: (_a = (c.scores || {})[ax.id]) != null ? _a : "",
-        onChange: (e) => updateQuiz((z) => {
-          const s = z.questions[qi].choices[ci].scores = z.questions[qi].choices[ci].scores || {};
-          if (e.target.value === "") delete s[ax.id];
-          else s[ax.id] = Number(e.target.value);
-        })
-      }
-    ));
-  })))), /* @__PURE__ */ React.createElement("button", { style: { ...ghostBtn, marginTop: "0.8rem" }, onClick: () => updateQuiz((z) => {
-    z.questions[qi].choices.push({ id: "c" + Date.now().toString(36), label: "新しい選択肢", scores: {} });
-  }) }, "＋選択肢"))), /* @__PURE__ */ React.createElement("button", { style: { ...ghostBtn, marginTop: "1.2rem" }, onClick: () => updateQuiz((z) => {
-    z.questions.push({ id: "q" + Date.now().toString(36), text: "新しい質問", choices: [{ id: "c" + Date.now().toString(36), label: "選択肢", scores: {} }] });
-  }) }, "＋質問を追加"));
-}
-function QuizPage() {
-  const { lib, editing, updateQuiz } = useContext(NovelContext);
-  const quiz = lib.quiz, axes = lib.radar.axes;
-  const [step, setStep] = useState(-1);
-  const [answers, setAnswers] = useState([]);
-  const n = quiz.questions.length;
-  const result = useMemo(() => {
-    if (step < n || n === 0) return null;
-    const raw = {};
-    answers.forEach((cid, qi) => {
-      const c = quiz.questions[qi] && quiz.questions[qi].choices.find((x) => x.id === cid);
-      if (c) Object.keys(c.scores || {}).forEach((k) => {
-        raw[k] = (raw[k] || 0) + Number(c.scores[k] || 0);
-      });
-    });
-    const pct = normalizeQuizScores(raw, axes);
-    return { pct, profile: quizProfile(pct, axes), items: quizRecommend(pct, lib) };
-  }, [step, answers]);
-  const choose = (cid) => {
-    const a = answers.slice();
-    a[step] = cid;
-    setAnswers(a);
-    setStep(step + 1);
-  };
-  const q = step >= 0 && step < n ? quiz.questions[step] : null;
-  return /* @__PURE__ */ React.createElement("main", { style: { minHeight: "100vh", background: "var(--charcoal)", color: "var(--offwhite)" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: "42rem", margin: "0 auto", padding: "5rem 1.5rem 7rem" } }, /* @__PURE__ */ React.createElement("div", { style: { marginBottom: "3rem" } }, /* @__PURE__ */ React.createElement(BackLink, { href: "#/", light: true }, "作品一覧")), /* @__PURE__ */ React.createElement("h1", { className: "font-heading", style: { fontWeight: 300, fontSize: "1.75rem", letterSpacing: "0.15em", marginBottom: "1rem" } }, /* @__PURE__ */ React.createElement(EditableText, { lines: true, value: quiz.title, onChange: (v) => updateQuiz((z) => {
-    z.title = v;
-  }) })), step === -1 && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { opacity: 0.65, fontSize: "0.9rem", lineHeight: 2, marginBottom: "2.5rem" } }, /* @__PURE__ */ React.createElement(EditableText, { lines: true, value: quiz.desc, onChange: (v) => updateQuiz((z) => {
-    z.desc = v;
-  }) })), n > 0 && /* @__PURE__ */ React.createElement("button", { style: { ...ghostBtn, fontSize: "0.85rem", padding: "0.7rem 1.8rem" }, onClick: () => {
-    setAnswers([]);
-    setStep(0);
-  } }, quiz.startLabel || "診断をはじめる")), q && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { className: "font-display", style: { letterSpacing: "0.3em", fontSize: "0.75rem", opacity: 0.5, margin: "1.5rem 0" } }, step + 1, " / ", n), /* @__PURE__ */ React.createElement("div", { style: { height: 2, background: "hsl(0 0% 100% / 0.12)", marginBottom: "2rem" } }, /* @__PURE__ */ React.createElement("div", { style: { height: 2, width: step / n * 100 + "%", background: "var(--offwhite)", opacity: 0.7, transition: "width 0.5s" } })), /* @__PURE__ */ React.createElement("p", { style: { fontSize: "1.1rem", lineHeight: 1.9, letterSpacing: "0.06em", marginBottom: "2rem" } }, q.text), /* @__PURE__ */ React.createElement("div", { style: { display: "grid", gap: "0.8rem" } }, q.choices.map((c) => /* @__PURE__ */ React.createElement("button", { key: c.id, onClick: () => choose(c.id), style: { ...ghostBtn, textAlign: "left", fontSize: "0.9rem", padding: "1rem 1.2rem", letterSpacing: "0.06em", lineHeight: 1.7, fontFamily: "var(--font-body)" } }, c.label))), step > 0 && /* @__PURE__ */ React.createElement("button", { style: { ...ghostBtn, marginTop: "1.5rem", border: "none" }, onClick: () => setStep(step - 1) }, "← 前の質問へ")), result && /* @__PURE__ */ React.createElement("div", null, /* @__PURE__ */ React.createElement("p", { style: { lineHeight: 2, opacity: 0.75, margin: "1.5rem 0 2rem" } }, result.profile), /* @__PURE__ */ React.createElement(RadarChart, { axes, works: [{ id: "me" }], values: { me: result.pct }, activeId: "me" }), /* @__PURE__ */ React.createElement("p", { className: "font-display", style: { letterSpacing: "0.3em", fontSize: "0.75rem", opacity: 0.5, margin: "2.5rem 0 1rem" } }, "RECOMMENDED"), result.items.map((it) => /* @__PURE__ */ React.createElement("a", { key: it.work.id, href: "#/w/" + it.work.id, style: { display: "block", border: "1px solid hsl(0 0% 100% / 0.2)", padding: "1.2rem 1.4rem", marginBottom: "1rem" } }, /* @__PURE__ */ React.createElement("span", { className: "font-display", style: { fontSize: "0.75rem", opacity: 0.5, letterSpacing: "0.3em" } }, "No.", it.rank, "　適合 ", Math.round(it.sim), "%"), /* @__PURE__ */ React.createElement("span", { className: "font-heading", style: { display: "block", fontSize: "1.2rem", margin: "0.4rem 0", letterSpacing: "0.1em" } }, renderTitleRed(it.work.title)), /* @__PURE__ */ React.createElement("span", { style: { display: "block", fontSize: "0.82rem", lineHeight: 1.9, opacity: 0.7 } }, it.reason))), /* @__PURE__ */ React.createElement("button", { style: { ...ghostBtn, marginTop: "1.5rem" }, onClick: () => {
-    setStep(-1);
-    setAnswers([]);
-  } }, "もう一度診断する")), editing && /* @__PURE__ */ React.createElement(QuizEditor, null)));
-}
-function WorkAdmin() {
-  const { meta, chapters, updateMeta, addChapter, removeChapter, editing } = useContext(NovelContext);
-  if (!editing) return null;
-  const row = { display: "flex", gap: "0.5rem", marginBottom: "0.5rem", alignItems: "center" };
-  return /* @__PURE__ */ React.createElement("div", { style: { background: "var(--offwhite)", color: "var(--charcoal)", padding: "2rem 1.5rem 6rem", borderTop: "1px dashed hsl(0 0% 10% / 0.3)" } }, /* @__PURE__ */ React.createElement("div", { style: { maxWidth: "48rem", margin: "0 auto" } }, /* @__PURE__ */ React.createElement("p", { style: { fontSize: "0.8rem", opacity: 0.6, marginBottom: "1rem" } }, "登場人物・時系列の追加と削除（編集モードのみ表示）"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: "0.85rem", margin: "1rem 0 0.5rem" } }, "表紙の一文（本文からの引用。空欄なら非表示）"), /* @__PURE__ */ React.createElement("input", { style: { ...inputStyle, marginBottom: "0.5rem" }, value: meta.quote || "", onChange: (e) => updateMeta({ quote: e.target.value }) }), /* @__PURE__ */ React.createElement("p", { style: { fontSize: "0.85rem", margin: "1rem 0 0.5rem" } }, "登場人物"), (meta.characters || []).map((c, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: row }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: "0.85rem" } }, c.name || "（名前なし）"), /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => updateMeta({ characters: meta.characters.filter((_, j) => j !== i) }) }, "削除"))), /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => updateMeta({ characters: [...meta.characters || [], { name: "新しい人物", role: "", desc: "" }] }) }, "＋人物を追加"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: "0.85rem", margin: "1.5rem 0 0.5rem" } }, "時系列"), (meta.timeline || []).map((t, i) => /* @__PURE__ */ React.createElement("div", { key: i, style: row }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: "0.85rem" } }, t.when || "（時期なし）"), /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => updateMeta({ timeline: meta.timeline.filter((_, j) => j !== i) }) }, "削除"))), /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => updateMeta({ timeline: [...meta.timeline || [], { when: "新しい時期", event: "" }] }) }, "＋時系列を追加"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: "0.85rem", margin: "1.5rem 0 0.5rem" } }, "章"), chapters.map((c) => /* @__PURE__ */ React.createElement("div", { key: c.num, style: row }, /* @__PURE__ */ React.createElement("span", { style: { flex: 1, fontSize: "0.85rem" } }, String(c.num).padStart(2, "0"), "　", c.title || "（無題）"), chapters.length > 1 && /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: () => {
-    if (confirm("この章を削除しますか？")) removeChapter(c.num);
-  } }, "削除"))), /* @__PURE__ */ React.createElement("button", { style: ghostBtn, onClick: addChapter }, "＋章を追加"), /* @__PURE__ */ React.createElement("p", { style: { fontSize: "0.75rem", opacity: 0.55, marginTop: "1.2rem", lineHeight: 1.8 } }, "章の本文は、各章のページを開いて編集します。段落は空行で区切り、場面転換は全角スペース1字だけの段落にすると区切り線になります。")));
-}
-function WorkView({ id, sub }) {
-  const app = useContext(NovelContext);
-  const wd = app.workData[id];
-  const entry = (app.lib.works || []).find((w) => w.id === id);
-  useEffect(() => {
-    if (entry) app.ensureWork(id);
-  }, [id, !!entry]);
-  if (!entry) {
-    return /* @__PURE__ */ React.createElement("main", { style: { minHeight: "100vh", background: "var(--offwhite)", color: "var(--charcoal)", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("div", { style: { textAlign: "center" } }, /* @__PURE__ */ React.createElement("p", { className: "font-heading", style: { fontSize: "1.4rem", marginBottom: "1.5rem" } }, "作品が見つかりません"), /* @__PURE__ */ React.createElement("a", { href: "#/", style: { opacity: 0.6 } }, "作品一覧へ戻る")));
-  }
-  if (!wd || !wd.ready) {
-    return /* @__PURE__ */ React.createElement("main", { style: { minHeight: "100vh", background: "var(--charcoal)", color: "var(--offwhite)", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("p", { className: "font-display", style: { letterSpacing: "0.3em", fontSize: "0.85rem", opacity: 0.6 } }, "Loading…"));
-  }
-  const value = {
-    ...app,
-    meta: wd.meta,
-    chapters: wd.chapters,
-    base: "#/w/" + id,
-    updateMeta: (p) => app.updateWorkMeta(id, p),
-    updateChapterTitle: (n, t) => app.updateChapterTitle(id, n, t),
-    updateChapterBody: (n, t) => app.updateChapterBody(id, n, t),
-    addChapter: () => app.addChapter(id),
-    removeChapter: (n) => app.removeChapter(id, n)
-  };
-  let page;
-  if (sub === "" || sub === "/") page = /* @__PURE__ */ React.createElement(WorkHome, null);
-  else if (sub === "/contents") page = /* @__PURE__ */ React.createElement(Contents, null);
-  else if (sub.startsWith("/read/")) page = /* @__PURE__ */ React.createElement(Read, { route: sub });
-  else page = /* @__PURE__ */ React.createElement(WorkHome, null);
-  return /* @__PURE__ */ React.createElement(NovelContext.Provider, { value }, page, (sub === "" || sub === "/") && /* @__PURE__ */ React.createElement("a", { href: "#/", className: "font-display", style: { position: "fixed", top: "1rem", left: "1rem", zIndex: 50, fontSize: "0.7rem", letterSpacing: "0.25em", color: "var(--offwhite)", opacity: 0.6 } }, "← LIBRARY"), (sub === "" || sub === "/" || sub === "/contents") && /* @__PURE__ */ React.createElement(WorkAdmin, null));
-}
+
 function App() {
   const route = useHashRoute();
-  const [lib, setLib] = useState(() => {
-    try {
-      const raw = localStorage.getItem("nb2:lib");
-      if (raw) {
-        const o = JSON.parse(raw);
-        if (o && Array.isArray(o.works)) return { ...defaultLibrary(), ...o };
-      }
-    } catch (e) {
-    }
-    return defaultLibrary();
-  });
-  const [workData, setWorkData] = useState(() => ({
-    [EMBEDDED_ID]: { ready: true, meta: clone(defaultNovelMeta), chapters: clone(defaultChapters) }
-  }));
-  const [dirtyWorks, setDirtyWorks] = useState({});
-  const [libDirty, setLibDirty] = useState(false);
+  const [meta, setMeta] = useState(() => ({ ...defaultNovelMeta }));
+  const [chapters, setChapters] = useState(() =>
+    defaultChapters.map((c) => ({ ...c, paragraphs: [...c.paragraphs] }))
+  );
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
-  const requested = useRef({});
-  const libRef = useRef(lib);
-  libRef.current = lib;
+
   useEffect(() => {
-    if (!auth) return;
-    return auth.onAuthStateChanged((u) => {
+    if (!auth) {
+      setAuthReady(true);
+      return;
+    }
+    const unsub = auth.onAuthStateChanged((u) => {
       setUser(u);
+      setAuthReady(true);
       if (!u) setEditing(false);
     });
+    return () => unsub();
   }, []);
+
+  // まずローカルのデフォルトで画面を出し、Firestore は裏で同期する
   useEffect(() => {
-    let done = false;
-    const finish = () => {
-      if (!done) {
-        done = true;
-        setLoaded(true);
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    try {
+      if (localStorage.getItem("novelblank:embedVer") === EMBED_VERSION) {
+        const rawMeta = localStorage.getItem("novelblank:meta");
+        if (rawMeta) {
+          const lm = JSON.parse(rawMeta);
+          if (lm && typeof lm === "object") setMeta({ ...defaultNovelMeta, ...lm });
+        }
+      }
+    } catch (e) { console.warn("localStorage meta load failed", e); }
+
+    try {
+      const raw = localStorage.getItem("novelblank:embedVer") === EMBED_VERSION ? localStorage.getItem("novelblank:chapters") : null;
+      if (raw) {
+        const localChs = JSON.parse(raw);
+        if (Array.isArray(localChs) && localChs.length > 0) {
+          setChapters(
+            localChs.map((c) => ({
+              ...c,
+              paragraphs: Array.isArray(c.paragraphs) ? [...c.paragraphs] : []
+            }))
+          );
+          console.info("Loaded chapters from localStorage");
+        }
+      }
+    } catch (e) {
+      console.warn("localStorage chapters load failed", e);
+    }
+
+    const applyData = (data) => {
+      if (!data) return;
+      if (!data.meta || data.meta.embeddedVersion !== EMBED_VERSION) return;
+      if (data.meta) {
+        setMeta({
+          ...defaultNovelMeta,
+          ...data.meta,
+          characters: data.meta.characters || defaultNovelMeta.characters,
+          timeline: data.meta.timeline || defaultNovelMeta.timeline
+        });
+      }
+      if (data.chapters && Array.isArray(data.chapters) && data.chapters.length > 0) {
+        setChapters(
+          data.chapters.map((c) => ({
+            ...c,
+            paragraphs: Array.isArray(c.paragraphs) ? [...c.paragraphs] : []
+          }))
+        );
+        try { localStorage.setItem("novelblank:chapters", JSON.stringify(data.chapters)); } catch (e) {}
       }
     };
-    const timer = setTimeout(finish, 6e3);
+
     (async () => {
       try {
-        const data = await cloudLoad(LIB_DOC);
-        if (data && Array.isArray(data.works)) {
-          const d = defaultLibrary();
-          setLib({
-            site: { ...d.site, ...data.site || {} },
-            works: data.works,
-            radar: { ...d.radar, ...data.radar || {}, values: data.radar && data.radar.values || {} },
-            quiz: { ...d.quiz, ...data.quiz || {} }
-          });
+        const data = await loadNovelViaRest();
+        if (cancelled) return;
+        if (data) {
+          applyData(data);
+          console.info("Firestore REST data loaded");
+          return;
         }
-      } catch (e) {
-        console.warn("library load failed", e);
+        console.info("No Firestore doc via REST — using defaults");
+      } catch (restErr) {
+        console.warn("REST load failed, trying SDK:", restErr);
       }
-      clearTimeout(timer);
-      finish();
+      try {
+        if (!db) return;
+        const snap = await Promise.race([
+          db.collection(STORAGE_COLLECTION).doc(STORAGE_DOC).get(),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Firestore timeout")), 8000)
+          )
+        ]);
+        if (cancelled) return;
+        if (snap && snap.exists) {
+          applyData(snap.data());
+          console.info("Firestore SDK data loaded");
+        }
+      } catch (err) {
+        console.warn("Firebase load failed, using defaults:", err);
+        if (!cancelled) setLoadError(String(err && err.message ? err.message : err));
+      }
     })();
-    return () => clearTimeout(timer);
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
-  const ensureWork = (id) => {
-    if (requested.current[id]) return;
-    requested.current[id] = true;
-    const entry = (libRef.current.works || []).find((w) => w.id === id);
-    if (!entry) return;
-    (async () => {
-      let data = null;
-      try {
-        data = await cloudLoad(entry.docId);
-      } catch (e) {
-        console.warn("work load failed", e);
-      }
-      setWorkData((prev) => {
-        const cur = prev[id];
-        let next = cur ? { ...cur } : { ...emptyWork(entry.title), ready: false };
-        if (data && data.meta && Array.isArray(data.chapters) && data.chapters.length) {
-          const ok = id !== EMBEDDED_ID || data.meta.embeddedVersion === EMBED_VERSION;
-          if (ok) {
-            next = {
-              ready: true,
-              meta: { ...cur ? cur.meta : emptyWork().meta, ...data.meta, characters: data.meta.characters || [], timeline: data.meta.timeline || [] },
-              chapters: data.chapters.map((c) => ({ ...c, paragraphs: Array.isArray(c.paragraphs) ? [...c.paragraphs] : [] }))
-            };
-          }
-        }
-        next.ready = true;
-        return { ...prev, [id]: next };
-      });
-    })();
-  };
-  const markWork = (id) => setDirtyWorks((d) => ({ ...d, [id]: true }));
-  const updateWorkMeta = (id, partial) => {
-    setWorkData((p) => ({ ...p, [id]: { ...p[id], meta: { ...p[id].meta, ...partial } } }));
-    markWork(id);
-  };
-  const updateChapterTitle = (id, num, title) => {
-    setWorkData((p) => ({ ...p, [id]: { ...p[id], chapters: p[id].chapters.map((c) => c.num === num ? { ...c, title } : c) } }));
-    markWork(id);
-  };
-  const updateChapterBody = (id, num, text) => {
-    const cleaned = String(text || "").replace(/\r\n/g, "\n").split(/\n\n+/).map((s) => s.replace(/^\n+|\n+$/g, "")).filter((s) => s.length > 0);
-    setWorkData((p) => ({ ...p, [id]: { ...p[id], chapters: p[id].chapters.map((c) => c.num === num ? { ...c, paragraphs: cleaned } : c) } }));
-    markWork(id);
-  };
-  const addChapter = (id) => {
-    setWorkData((p) => {
-      const chs = p[id].chapters;
-      return { ...p, [id]: { ...p[id], chapters: [...chs, { num: chs.length + 1, title: "第" + (chs.length + 1) + "話", paragraphs: [] }] } };
-    });
-    markWork(id);
-  };
-  const removeChapter = (id, num) => {
-    setWorkData((p) => ({ ...p, [id]: { ...p[id], chapters: p[id].chapters.filter((c) => c.num !== num).map((c, i) => ({ ...c, num: i + 1 })) } }));
-    markWork(id);
-  };
-  const mutateLib = (fn) => {
-    setLib((l) => {
-      const n = clone(l);
-      fn(n);
-      return n;
-    });
-    setLibDirty(true);
-  };
-  const updateSite = (partial) => mutateLib((l) => {
-    l.site = { ...l.site, ...partial };
-  });
-  const updateRadar = (fn) => mutateLib((l) => fn(l.radar));
-  const updateQuiz = (fn) => mutateLib((l) => fn(l.quiz));
-  const addWork = () => {
-    const id = "w" + Date.now().toString(36);
-    const title = "新しい作品";
-    setWorkData((p) => ({ ...p, [id]: { ready: true, ...emptyWork(title) } }));
-    requested.current[id] = true;
-    markWork(id);
-    mutateLib((l) => {
-      l.works.push({ id, docId: "work_" + id, draft: true, title, titleEn: "", synopsis: "", chapterCount: 1 });
-      l.radar.values[id] = {};
-      l.radar.axes.forEach((a) => {
-        l.radar.values[id][a.id] = 50;
-      });
-    });
-    window.location.hash = "#/w/" + id;
-  };
-  const removeWork = async (id) => {
-    if (!confirm("この作品を削除します。本文もクラウドから削除されます。よろしいですか？")) return;
-    const entry = libRef.current.works.find((w) => w.id === id);
-    mutateLib((l) => {
-      l.works = l.works.filter((w) => w.id !== id);
-      delete l.radar.values[id];
-    });
-    if (entry && auth && auth.currentUser) {
-      try {
-        cloudDelete(entry.docId, await auth.currentUser.getIdToken());
-      } catch (e) {
-      }
-    }
-  };
-  const moveWork = (id, dir) => mutateLib((l) => {
-    const i = l.works.findIndex((w) => w.id === id), j = i + dir;
-    if (i < 0 || j < 0 || j >= l.works.length) return;
-    const t = l.works[i];
-    l.works[i] = l.works[j];
-    l.works[j] = t;
-  });
-  const toggleDraft = (id) => mutateLib((l) => {
-    const w = l.works.find((x) => x.id === id);
-    if (w) w.draft = !w.draft;
-  });
-  const dirty = libDirty || Object.keys(dirtyWorks).length > 0;
-  const saveToFirebase = async () => {
+
+  const markDirty = useCallback(() => setDirty(true), []);
+
+  const updateMeta = useCallback((partial) => {
+    setMeta((m) => ({ ...m, ...partial }));
+    setDirty(true);
+  }, []);
+
+  const updateChapterTitle = useCallback((num, title) => {
+    setChapters((chs) =>
+      chs.map((c) => (c.num === num ? { ...c, title } : c))
+    );
+    setDirty(true);
+  }, []);
+
+  const updateChapterBody = useCallback((num, text) => {
+    // 空行（2つ以上の改行）で段落分割。全文を一括編集できる
+    const cleaned = String(text || "")
+      .replace(/\r\n/g, "\n")
+      .split(/\n\n+/)
+      .map((s) => s.replace(/^\n+|\n+$/g, ""))
+      .filter((s) => s.length > 0);
+    setChapters((chs) =>
+      chs.map((c) => (c.num === num ? { ...c, paragraphs: cleaned } : c))
+    );
+    setDirty(true);
+  }, []);
+
+  const saveToFirebase = useCallback(async () => {
     if (!auth || !auth.currentUser) {
-      alert("保存するにはログインが必要です。題名を5回タップしてログインしてください。");
+      alert("保存するにはログインが必要です。EDIT からログインしてください。");
       setShowLogin(true);
       return;
     }
     setSaving(true);
     try {
-      const token = await auth.currentUser.getIdToken();
-      let nextLib = clone(libRef.current);
-      for (const id of Object.keys(dirtyWorks)) {
-        const wd = workData[id];
-        const entry = nextLib.works.find((w) => w.id === id);
-        if (!wd || !entry) continue;
-        const meta = id === EMBEDDED_ID ? { ...wd.meta, embeddedVersion: EMBED_VERSION } : wd.meta;
-        await cloudSave(entry.docId, { meta, chapters: wd.chapters, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }, token);
-        entry.title = wd.meta.title || entry.title;
-        entry.titleEn = wd.meta.titleEn || "";
-        entry.synopsis = wd.meta.synopsis || "";
-        entry.chapterCount = wd.chapters.length;
-      }
-      await cloudSave(LIB_DOC, { ...nextLib, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }, token);
-      setLib(nextLib);
+      localStorage.setItem("novelblank:chapters", JSON.stringify(chapters));
+      localStorage.setItem("novelblank:embedVer", EMBED_VERSION);
+      localStorage.setItem("novelblank:meta", JSON.stringify(meta));
+      console.info("Saved chapters to localStorage");
+    } catch (lsErr) {
+      console.warn("localStorage save failed:", lsErr);
+    }
+    
+    const payload = {
+      meta: { ...meta, embeddedVersion: EMBED_VERSION },
+      chapters: chapters,
+      updatedAt: new Date().toISOString()
+    };
+    try {
+      const idToken = await auth.currentUser.getIdToken();
       try {
-        localStorage.setItem("nb2:lib", JSON.stringify(nextLib));
-      } catch (e) {
+        await saveNovelViaRest(payload, idToken);
+        setDirty(false);
+        console.info("Saved via REST"); alert("クラウドに保存しました");
+        return;
+      } catch (restErr) {
+        console.warn("REST save failed, trying SDK:", restErr);
       }
-      setDirtyWorks({});
-      setLibDirty(false);
-      alert("クラウドに保存しました");
+      if (!db) throw new Error("Firestore に接続できません");
+      await db.collection(STORAGE_COLLECTION).doc(STORAGE_DOC).set({
+        meta: { ...meta, embeddedVersion: EMBED_VERSION },
+        chapters: chapters,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      setDirty(false);
+      console.info("Saved via SDK");
     } catch (err) {
-      console.error(err);
-      alert("クラウド保存に失敗しました: " + (err && err.message ? err.message : err));
+      console.error("Save failed:", err);
+      setDirty(false);
+      alert("クラウド保存に失敗しました（端末内には保存済み）: " + (err && err.message ? err.message : err));
     } finally {
       setSaving(false);
     }
-  };
-  const logout = async () => {
+  }, [meta, chapters]);
+
+  const logout = useCallback(async () => {
     try {
       if (auth) await auth.signOut();
-    } catch (e) {
+      setEditing(false);
+      setShowLogin(false);
+    } catch (err) {
+      console.error("Logout failed:", err);
     }
-    setEditing(false);
-    setShowLogin(false);
-  };
+  }, []);
+
   const ctx = {
-    lib,
-    workData,
-    ensureWork,
+    meta,
+    chapters,
     editing,
     setEditing,
     saving,
     dirty,
+    updateMeta,
+    updateChapterTitle,
+    updateChapterBody,
+    saveToFirebase,
     user,
     showLogin,
     setShowLogin,
-    logout,
-    saveToFirebase,
-    updateSite,
-    updateRadar,
-    updateQuiz,
-    addWork,
-    removeWork,
-    moveWork,
-    toggleDraft,
-    updateWorkMeta,
-    updateChapterTitle,
-    updateChapterBody,
-    addChapter,
-    removeChapter,
-    base: "#/",
-    meta: defaultNovelMeta,
-    chapters: []
+    logout
   };
-  let page, routeKey = route === "" ? "/" : route;
+
+  let page;
   if (!loaded) {
-    page = /* @__PURE__ */ React.createElement("main", { style: { minHeight: "100vh", background: "var(--charcoal)", color: "var(--offwhite)", display: "flex", alignItems: "center", justifyContent: "center" } }, /* @__PURE__ */ React.createElement("p", { className: "font-display", style: { letterSpacing: "0.3em", fontSize: "0.85rem", opacity: 0.6 } }, "Loading…"));
-  } else if (route === "/" || route === "") page = /* @__PURE__ */ React.createElement(Library, null);
-  else if (route === "/radar") page = /* @__PURE__ */ React.createElement(RadarPage, null);
-  else if (route === "/quiz") page = /* @__PURE__ */ React.createElement(QuizPage, null);
-  else if (route.startsWith("/w/")) {
-    const m = route.match(/^\/w\/([^/]+)(\/.*)?$/);
-    page = /* @__PURE__ */ React.createElement(WorkView, { id: m ? decodeURIComponent(m[1]) : "", sub: m && m[2] || "" });
-    routeKey = route;
-  } else page = /* @__PURE__ */ React.createElement(Library, null);
-  return /* @__PURE__ */ React.createElement(NovelContext.Provider, { value: ctx }, /* @__PURE__ */ React.createElement(PageTransition, { routeKey }, page), loaded && /* @__PURE__ */ React.createElement(EditToolbar, null));
+    page = React.createElement(
+      "main",
+      {
+        style: {
+          minHeight: "100vh",
+          background: "var(--charcoal)",
+          color: "var(--offwhite)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }
+      },
+      React.createElement(
+        "p",
+        {
+          className: "font-display",
+          style: { letterSpacing: "0.3em", fontSize: "0.85rem", opacity: 0.6 }
+        },
+        "Loading…"
+      )
+    );
+  } else if (route === "/" || route === "") {
+    page = React.createElement(Home);
+  } else if (route === "/contents") {
+    page = React.createElement(Contents);
+  } else if (route.startsWith("/read/")) {
+    page = React.createElement(Read, { route });
+  } else {
+    page = React.createElement(
+      "main",
+      {
+        style: {
+          minHeight: "100vh",
+          background: "var(--offwhite)",
+          color: "var(--charcoal)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 1.5rem"
+        }
+      },
+      React.createElement(
+        "div",
+        { style: { textAlign: "center" } },
+        React.createElement(
+          "p",
+          {
+            className: "font-heading",
+            style: { fontSize: "1.5rem", letterSpacing: "0.1em", marginBottom: "1.5rem" }
+          },
+          "ページが見つかりません"
+        ),
+        React.createElement(
+          "a",
+          {
+            href: "#/",
+            style: {
+              fontFamily: "var(--font-body)",
+              fontSize: "0.875rem",
+              color: "var(--charcoal)",
+              opacity: 0.6
+            }
+          },
+          "表紙へ戻る"
+        )
+      )
+    );
+  }
+
+  return React.createElement(
+    NovelContext.Provider,
+    { value: ctx },
+    React.createElement(
+      React.Fragment,
+      null,
+      React.createElement(PageTransition, { routeKey: route.startsWith("/read/") ? route : (route === "" ? "/" : route) }, page),
+      loaded && React.createElement(EditToolbar)
+    )
+  );
 }
-class ErrorBoundary extends React.Component {
-  constructor(p) {
-    super(p);
-    this.state = { err: null };
-  }
-  static getDerivedStateFromError(err) {
-    return { err };
-  }
-  render() {
-    if (this.state.err) {
-      return React.createElement(
-        "pre",
-        { style: { whiteSpace: "pre-wrap", padding: "1.5rem", fontSize: "12px", color: "#fff", background: "#400", minHeight: "100vh" } },
-        "表示中にエラーが起きました:\n" + String(this.state.err && (this.state.err.stack || this.state.err.message || this.state.err))
-      );
-    }
-    return this.props.children;
-  }
-}
-ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(ErrorBoundary, null, React.createElement(App)));
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
 </script>
 
 </body>
